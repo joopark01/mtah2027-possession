@@ -1,13 +1,8 @@
 {
-  "_comment": "Every threshold the feature extractor uses. No defaults live in the code: change them here, and the value used is copied into the provenance JSON next to the output.",
+  "_comment": "Every threshold the feature extractor uses. No defaults live in the code. Every key must have an entry in _provenance; extract_features.py refuses to run otherwise. Under the organisers' 2026-11-03 rules nothing may be tuned on the ground truth or the video: a value is either published, follows from the Laws of the Game or physics, or is an a-priori choice to be tuned on EXTERNAL data only (tuned_on names the dataset once that happens).",
 
   "fps": 25,
-
-  "kickoff_video_frames": {
-    "_source": "FAQ.md / starter/load_smart_tagging.py: first-half kickoff = first graded frame, second-half kickoff at 113742",
-    "1": 11185,
-    "2": 113742
-  },
+  "kickoff_video_frames": {"1": 11185, "2": 113742},
   "kickoff_window_frames": 25,
   "kickoff_min_centroid_separation_m": 5.0,
 
@@ -21,9 +16,92 @@
   "player_walking_speed_m_s": 2.0,
   "near_ball_radii_m": [3.0, 10.0],
 
-  "smart_tagging_team_map": {
-    "Barcelona": "H",
-    "Atletic Club": "A",
-    "N/A": "NA"
+  "smart_tagging_team_map": {"Barcelona": "H", "Atletic Club": "A", "N/A": "NA"},
+
+  "_provenance": {
+    "fps": {
+      "basis": "published",
+      "source": "games.py GAMES['BAR-ATH']['fps'] and DATA.md; the script asserts the two agree",
+      "reason": "Frame rate of the tactical video and its ATD.",
+      "tuned_on": null
+    },
+    "kickoff_video_frames": {
+      "basis": "published",
+      "source": "DATA.md, FAQ.md, starter/load_smart_tagging.py KICKOFF_VIDEO_FRAMES",
+      "reason": "First-half kickoff is the first graded frame; second-half kickoff is 113742 (the 2nd half is graded from 110808, so 2,934 frames before it are dead ball).",
+      "tuned_on": null
+    },
+    "kickoff_window_frames": {
+      "basis": "law_of_game",
+      "source": "IFAB Laws of the Game, Law 8 (The Start and Restart of Play)",
+      "reason": "At a kickoff every player must be in their own half. Averaging positions over the 1 s (25 frames) before the kickoff reads each team's side robustly against single-frame tracking noise. Used only to find attacking direction.",
+      "tuned_on": null
+    },
+    "kickoff_min_centroid_separation_m": {
+      "basis": "law_of_game",
+      "source": "IFAB Laws of the Game, Law 8",
+      "reason": "With both teams in their own halves, their centroids are separated along the pitch length by a large margin. 5 m is a deliberately loose lower bound used only in an assertion, so a wrong axis orientation or kickoff frame makes the script stop instead of producing mirrored features. Not a modelling threshold.",
+      "tuned_on": null
+    },
+    "ball_max_interp_gap_frames": {
+      "basis": "a_priori",
+      "source": "design choice",
+      "reason": "Linear interpolation assumes no touch inside the gap. Limiting it to 0.48 s (12 frames) keeps that assumption plausible while bridging short occlusions; longer gaps stay NaN so later stages can treat them as unknown.",
+      "tuned_on": null,
+      "revisit": "tune on external matches with artificially dropped ball frames"
+    },
+    "velocity_half_window_frames": {
+      "basis": "a_priori",
+      "source": "design choice",
+      "reason": "Central difference over +/-2 frames (0.16 s total) balances noise against time resolution. Possession boundaries must be placed within a few frames, so wider windows would smear touches.",
+      "tuned_on": null,
+      "revisit": "tune on external matches"
+    },
+    "turn_min_speed_m_s": {
+      "basis": "physics",
+      "source": "design choice from measurement noise",
+      "reason": "Below about 1 m/s the ball's displacement over the velocity window (4 cm) is comparable to tracking jitter, so its direction is meaningless and the turn angle is set to NaN.",
+      "tuned_on": null,
+      "revisit": "check against jitter measured on external tracking"
+    },
+    "ball_still_speed_m_s": {
+      "basis": "law_of_game",
+      "source": "IFAB Laws of the Game, Laws 8, 13, 14, 16, 17 (ball must be stationary at kickoffs, free kicks, penalties, goal kicks, corners)",
+      "reason": "Restarts are taken from a stationary ball. 0.5 m/s is the 'stationary' cut-off, leaving room for tracking jitter.",
+      "tuned_on": null,
+      "revisit": "tune on external matches"
+    },
+    "ball_still_half_window_frames": {
+      "basis": "a_priori",
+      "source": "design choice",
+      "reason": "Stillness is measured over +/-0.48 s so a single slow frame in open play (a ball at the top of a bounce, a trap) does not look like a placed ball.",
+      "tuned_on": null,
+      "revisit": "tune on external matches"
+    },
+    "player_max_plausible_speed_m_s": {
+      "basis": "physics",
+      "source": "human sprint record about 12.4 m/s (Bolt, 100 m, 2009); elite footballers top out around 10 m/s",
+      "reason": "A per-track velocity above any human's is a tracker identity switch, not running. Set just above the human record so no real sprint is dropped.",
+      "tuned_on": null
+    },
+    "player_walking_speed_m_s": {
+      "basis": "published",
+      "source": "conventional football speed-zone boundary of 7.2 km/h between walking and jogging (e.g. Bradley et al. 2009, J Sports Sci)",
+      "reason": "Share of players walking is a dead-ball cue: play stops and players slow down.",
+      "tuned_on": null
+    },
+    "near_ball_radii_m": {
+      "basis": "law_of_game",
+      "source": "3 m: design choice (about one stride plus reach); 10 m: IFAB Laws 8, 13, 17 require opponents at least 9.15 m from the ball at kickoffs, free kicks and corners",
+      "reason": "Counts of players within playing distance (3 m) and within the restart exclusion distance (10 m, just above 9.15 m) of the ball.",
+      "tuned_on": null,
+      "revisit": "3 m radius: tune on external matches"
+    },
+    "smart_tagging_team_map": {
+      "basis": "published",
+      "source": "DATA.md Smart Tagging table: Team values are 'Barcelona', 'Atletic Club' (sic) and 'N/A'",
+      "reason": "Maps tag teams to the submission's H/A. N/A is kept as its own value (DATA.md: every throw-in is tagged N/A), never folded into a team.",
+      "tuned_on": null
+    }
   }
 }

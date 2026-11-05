@@ -34,6 +34,24 @@ Reads the tactical ATD, its metadata and the Smart Tagging from `data/` (or `MTA
 - **Ball gaps:** a gap is filled linearly only if it is at most `ball_max_interp_gap_frames` long and the ball is seen on both sides. Nothing is filled across a half boundary.
 - **Thresholds:** every one is in `config.json`; there are no defaults in the code.
 
+## Parameter provenance
+
+Every value in `config.json` has an entry in its `_provenance` block with `basis`, `source`, `reason` and `tuned_on`. The script refuses to run if any value lacks one. Allowed bases:
+
+| basis | meaning | today |
+|---|---|---|
+| `published` | stated in the challenge docs or a standard reference | fps, kickoff frames, walking speed, team map |
+| `law_of_game` | follows from the IFAB Laws of the Game | kickoff window and separation, still-ball speed, near-ball radii |
+| `physics` | follows from physics or human limits | turn-angle min speed, max plausible player speed |
+| `a_priori` | design choice made before seeing any labels | ball gap limit, velocity window, still-ball window |
+| `tuned_external` | tuned on an external dataset, named in `tuned_on` | none yet |
+
+**Rules for changing a value:**
+- **Tuning a value:** set `basis` to `tuned_external` and name the external dataset in `tuned_on`. The check rejects anything naming the provided game (`BAR-ATH`), because the organisers' 2026-11-03 rules forbid tuning on its ground truth or video.
+- **Revisiting a value:** the optional `revisit` field lists values planned for external tuning.
+
+The full block is copied into the provenance JSON written next to each output. Use it as the parameter table for the tech doc.
+
 ## Tests (no real data needed)
 
 ```bash

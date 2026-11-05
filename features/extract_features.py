@@ -398,6 +398,38 @@ def smart_tagging_features(path, n_frames, cfg):
     return dict(sorted(cols.items()))
 
 
+# -- config provenance ---------------------------------------------------------------------------
+
+PROVENANCE_BASES = {"published", "law_of_game", "physics", "a_priori", "tuned_external"}
+PROVENANCE_FIELDS = {"basis", "source", "reason", "tuned_on"}
+
+
+def check_provenance(cfg):
+    """Every config value must say where it came from (organisers' rules, 2026-11-03).
+
+    Fails if a key has no provenance entry, an entry has no matching key, a field is missing, the
+    basis is not one of PROVENANCE_BASES, or tuned_on disagrees with basis. 'tuned_external' is
+    the only basis that may (and must) name a tuning dataset, and it must not be the provided game.
+    """
+    keys = {k for k in cfg if not k.startswith("_")}
+    prov = cfg["_provenance"]
+    missing, orphan = keys - set(prov), set(prov) - keys
+    assert not missing, "config keys without provenance: {}".format(sorted(missing))
+    assert not orphan, "provenance for keys not in config: {}".format(sorted(orphan))
+    for key, entry in prov.items():
+        absent = PROVENANCE_FIELDS - set(entry)
+        assert not absent, "provenance of {!r} lacks {}".format(key, sorted(absent))
+        assert entry["basis"] in PROVENANCE_BASES, "provenance of {!r}: basis {!r} not in {}".format(
+            key, entry["basis"], sorted(PROVENANCE_BASES))
+        tuned = entry["tuned_on"]
+        if entry["basis"] == "tuned_external":
+            assert tuned, "{!r} is tuned_external but names no dataset".format(key)
+            assert "BAR-ATH" not in str(tuned), \
+                "{!r} claims tuning on the provided game -- not allowed".format(key)
+        else:
+            assert tuned is None, "{!r} has tuned_on but basis {!r}".format(key, entry["basis"])
+
+
 # -- driver -------------------------------------------------------------------------------------
 
 def half_index(game, n_frames):
@@ -408,6 +440,7 @@ def half_index(game, n_frames):
 
 
 def build(game, data_dir, cfg, use_cache):
+    check_provenance(cfg)
     meta_path, raw_path = require(["atd_meta", "atd_raw"], game, data_dir)
     n_frames = source_frames("tactical", game)
     pitch = GAMES[game]["pitch"]

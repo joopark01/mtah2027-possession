@@ -87,3 +87,28 @@ assert df["st_set_pieces_NA"].iloc[5000:5125].all()
 assert df["st_progression_A"].iloc[7500:7750].all()
 print("  ok  smart tagging intervals")
 print("\nall synthetic checks passed")
+
+# -- provenance guard: each broken config must be refused ------------------------------------------
+import copy  # noqa: E402
+
+def refused(mutate, label):
+    bad = copy.deepcopy(CFG)
+    mutate(bad)
+    try:
+        ef.check_provenance(bad)
+    except AssertionError:
+        print("  ok  provenance refuses: {}".format(label))
+        return
+    raise AssertionError("check_provenance accepted a config with " + label)
+
+ef.check_provenance(CFG)
+refused(lambda c: c.update(new_threshold=1.0), "a key without provenance")
+refused(lambda c: c["_provenance"].pop("fps"), "a missing entry")
+refused(lambda c: c["_provenance"]["fps"].pop("source"), "a missing field")
+refused(lambda c: c["_provenance"]["fps"].update(basis="vibes"), "an unknown basis")
+refused(lambda c: c["_provenance"]["fps"].update(tuned_on="IDSSE"), "tuned_on without tuned_external")
+refused(lambda c: c["_provenance"]["fps"].update(basis="tuned_external", tuned_on=None),
+        "tuned_external without a dataset")
+refused(lambda c: c["_provenance"]["fps"].update(basis="tuned_external", tuned_on="BAR-ATH public"),
+        "tuning on the provided game")
+print("all provenance checks passed")
