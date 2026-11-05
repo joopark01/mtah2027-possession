@@ -1,0 +1,52 @@
+# Per-frame feature table
+
+```bash
+pip install -r features/requirements.txt
+python features/extract_features.py --report
+```
+
+Reads the tactical ATD, its metadata and the Smart Tagging from `data/` (or `MTAH_DATA_DIR`). It writes three files to `data/derived/`, which is gitignored:
+
+- `features_tactical.parquet`: 199,319 rows, one per video frame (= submission row), about 60 columns
+- `features_tactical_provenance.json`: the config used, input file fingerprints, script hash, git commit and package versions
+- `atd_tactical_cache.npz`: the parsed raw tracking, so re-runs skip parsing. It is reused only while the raw file's size and mtime are unchanged.
+
+`--report` prints a label-free sanity summary over the graded frames: ball visibility, tracked objects, speed ranges, out-of-pitch share, and any extra raw ball fields. Where DATA.md publishes a figure, it is shown alongside. **The report reads no ground truth.** Under the organisers' 2026-11-03 rules, nothing in this pipeline may be fitted or calibrated on it.
+
+**Never commit or upload the outputs.** They are frame-level derived data (RULES.md).
+
+## Columns
+
+| group | columns |
+|---|---|
+| meta | `frame`, `half` (0 = ungraded), `graded` |
+| ball | `ball_seen`, `ball_interp`, `ball_x_m`, `ball_y_m`, `ball_gap_len`, `ball_since_seen`, `ball_until_seen`, `ball_vx`, `ball_vy`, `ball_speed`, `ball_accel`, `ball_turn_deg`, `ball_still_frac`, `ball_out_m` (> 0 outside the pitch), `ball_raw_f2…` (undocumented raw fields, kept as-is), `ball_dist_centre_m` |
+| team (`h_` / `a_`) | `n_tracked`, `cx_m`, `cy_m`, `std_x_m`, `std_y_m`, `spread_m`, `mean_speed`, `walking_frac`, `adv_x_m`, `adv_vx` (along the team's attacking direction), `own_half_frac`, `dmin_ball_m`, `d2_ball_m`, `n_within_{3,10}m` |
+| cross | `nearest_team` (0 H, 1 A, -1 none), `nearest_margin_m` (> 0 = home closer), `nearest_free_space_m`, `all_mean_speed`, `all_walking_frac`, `n_tracked`, `n_implausible_velocity` |
+| Smart Tagging | `st_<code>_<H/A/NA>`: true while that tag is active |
+
+## Conventions
+
+- **Units:** metres and m/s. Normalised x runs along the pitch length (105.3 m) and y along the width (68.0 m). The orientation is checked at both kickoffs, and the script stops if it doesn't hold.
+- **Attack direction:** read off the kickoff formation, and checked to flip at halftime.
+- **Velocities:** central difference over ±`velocity_half_window_frames`.
+- **Player identity switches:** a per-track velocity above `player_max_plausible_speed_m_s` is set to NaN and counted in `n_implausible_velocity`.
+- **Ball gaps:** a gap is filled linearly only if it is at most `ball_max_interp_gap_frames` long and the ball is seen on both sides. Nothing is filled across a half boundary.
+- **Thresholds:** every one is in `config.json`; there are no defaults in the code.
+
+## Tests (no real data needed)
+
+```bash
+python features/tests/make_synthetic_match.py /tmp/synth
+MTAH_DATA_DIR=/tmp/synth python features/tests/test_synthetic.py
+```
+
+This builds a full-length fake match with scripted events and checks the extracted features against the known answers. The events cover:
+
+- a straight ball run, and a short and a long gap
+- a 180° reversal
+- the ball out of play, and a still ball
+- a known nearest player for each team
+- one player running
+
+Run it after any change to the extractor.

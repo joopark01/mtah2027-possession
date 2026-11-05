@@ -1,0 +1,29 @@
+{
+  "_comment": "Every threshold the feature extractor uses. No defaults live in the code: change them here, and the value used is copied into the provenance JSON next to the output.",
+
+  "fps": 25,
+
+  "kickoff_video_frames": {
+    "_source": "FAQ.md / starter/load_smart_tagging.py: first-half kickoff = first graded frame, second-half kickoff at 113742",
+    "1": 11185,
+    "2": 113742
+  },
+  "kickoff_window_frames": 25,
+  "kickoff_min_centroid_separation_m": 5.0,
+
+  "ball_max_interp_gap_frames": 12,
+  "velocity_half_window_frames": 2,
+  "turn_min_speed_m_s": 1.0,
+  "ball_still_speed_m_s": 0.5,
+  "ball_still_half_window_frames": 12,
+
+  "player_max_plausible_speed_m_s": 12.5,
+  "player_walking_speed_m_s": 2.0,
+  "near_ball_radii_m": [3.0, 10.0],
+
+  "smart_tagging_team_map": {
+    "Barcelona": "H",
+    "Atletic Club": "A",
+    "N/A": "NA"
+  }
+}
