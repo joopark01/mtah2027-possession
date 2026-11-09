@@ -27,7 +27,8 @@ Conventions, stated once:
     track, in m/s. NaN wherever either end is missing.
   * "attack sign": +1 if that team attacks toward +x in that half. Read off the kickoff, where
     every player stands in their own half by law.
-  * Nothing is interpolated across a half boundary.
+  * Nothing is interpolated across a half boundary. Player speed / walking features come from
+    position velocity and are NaN where the +/- k window leaves the graded half.
   * Every threshold comes from features/config.json. There are no defaults in this file.
 """
 
@@ -307,7 +308,19 @@ def team_and_cross_features(players, team, ball_x, ball_y, half, signs, pitch, c
     vy[k:-k] = (py[2 * k:] - py[:-2 * k]) / (2.0 * k / fps)
     implausible = np.hypot(vx, vy) > cfg["player_max_plausible_speed_m_s"]
     vx[implausible] = np.nan; vy[implausible] = np.nan
+    # The central difference spans whatever frames sit at t +/- k, including halftime and
+    # pre-kickoff, so velocity is NaN unless t-k, t and t+k are all in the same graded half
+    # (frames outside the halves are NaN too). Masked after counting implausible jumps, so
+    # n_implausible_velocity still counts every jump; masked once, so speed, walking and adv_vx agree.
+    outside = ~same_half_window(half, k)
+    vx[outside] = np.nan; vy[outside] = np.nan
     speed_check = speed_unit_ratio(ps, vx, vy, half, k, cfg["speed_unit_check_moving_m_s"])
+    # Speed features use position speed, not the raw speed field (which is missing on ~1.6 tracked
+    # slots per frame and skips the jump filter).
+    pos_speed = np.hypot(vx, vy)
+    # Walking share: denominator = slots with a finite position speed on that frame.
+    walk = np.where(np.isnan(pos_speed), np.nan,
+                    (pos_speed < cfg["player_walking_speed_m_s"]) * 1.0)
 
     # Attack direction per frame for HOME; away is the opposite. 0 outside the halves.
     home_sign = np.zeros(len(px))
@@ -325,9 +338,8 @@ def team_and_cross_features(players, team, ball_x, ball_y, half, signs, pitch, c
         spread, _ = masked_mean(np.hypot(px[:, m] - cx[:, None], py[:, m] - cy[:, None]), axis=1)
         sx, _ = masked_mean((px[:, m] - cx[:, None]) ** 2, axis=1)
         sy, _ = masked_mean((py[:, m] - cy[:, None]) ** 2, axis=1)
-        mean_speed, _ = masked_mean(ps[:, m], axis=1)
-        walking, _ = masked_mean(np.where(np.isnan(ps[:, m]), np.nan,
-                                          (ps[:, m] < cfg["player_walking_speed_m_s"]) * 1.0), 1)
+        mean_speed, _ = masked_mean(pos_speed[:, m], axis=1)
+        walking, _ = masked_mean(walk[:, m], axis=1)
         mvx, _ = masked_mean(vx[:, m], axis=1)
         own_half, _ = masked_mean(np.where(np.isnan(px[:, m]), np.nan,
                                            (sign[:, None] * (px[:, m] - centre_x) < 0) * 1.0), 1)
@@ -362,13 +374,12 @@ def team_and_cross_features(players, team, ball_x, ball_y, half, signs, pitch, c
     d_opp = np.where(opp, np.hypot(px - nx[:, None], py - ny[:, None]), np.nan)
     free = np.where(has, masked_min(d_opp, axis=1), np.nan)
 
-    all_speed, _ = masked_mean(ps, axis=1)
+    all_speed, _ = masked_mean(pos_speed, axis=1)
     # Tracked = has a position. Speed can be missing on a tracked slot (e.g. a track's first
     # frame), so counting speeds would undercount; that shortfall is reported separately.
     n_all = (~np.isnan(px)).sum(axis=1)
     n_no_speed = (~np.isnan(px) & np.isnan(ps)).sum(axis=1)
-    all_walk, _ = masked_mean(np.where(np.isnan(ps), np.nan,
-                                       (ps < cfg["player_walking_speed_m_s"]) * 1.0), axis=1)
+    all_walk, _ = masked_mean(walk, axis=1)
     feats.update({
         "nearest_team": nearest_team,  # 0 home, 1 away, -1 no ball or no players
         "nearest_margin_m": dmins[AWAY] - dmins[HOME],  # > 0: home closer
@@ -382,6 +393,14 @@ def team_and_cross_features(players, team, ball_x, ball_y, half, signs, pitch, c
     return feats, speed_check
 
 
+def same_half_window(half, k):
+    """[N] bool: t-k, t and t+k all lie in the same graded half (half > 0)."""
+    assert k >= 1 and half.ndim == 1
+    same = np.zeros(len(half), dtype=bool)
+    same[k:-k] = (half[k:-k] > 0) & (half[:-2 * k] == half[k:-k]) & (half[2 * k:] == half[k:-k])
+    return same
+
+
 def speed_unit_ratio(ps, vx, vy, half, k, moving_m_s):
     """Median of raw speed field / position speed over moving player-frames. Label-free unit check.
 
@@ -391,9 +410,7 @@ def speed_unit_ratio(ps, vx, vy, half, k, moving_m_s):
     """
     assert ps.shape == vx.shape == vy.shape and ps.shape[0] == len(half)
     pos_speed = np.hypot(vx, vy)
-    same = np.zeros(len(half), dtype=bool)
-    same[k:-k] = (half[k:-k] > 0) & (half[:-2 * k] == half[k:-k]) & (half[2 * k:] == half[k:-k])
-    use = same[:, None] & np.isfinite(ps) & np.isfinite(pos_speed) & (pos_speed > moving_m_s)
+    use = same_half_window(half, k)[:, None] & np.isfinite(ps) & np.isfinite(pos_speed) & (pos_speed > moving_m_s)
     n = int(use.sum())
     ratio = float(np.median(ps[use] / pos_speed[use])) if n else float("nan")
     return {"ratio": ratio, "n_samples": n}
@@ -475,9 +492,6 @@ def build(game, data_dir, cfg, use_cache):
     print("  H = {}, A = {}; {} slots ({} home, {} away); ball has {} raw fields".format(
         names[0], names[1], len(team), int((team == HOME).sum()), int((team == AWAY).sum()),
         ball_raw.shape[1]))
-    speeds = players[:, :, 2]
-    assert np.nanmax(speeds) < 3 * cfg["player_max_plausible_speed_m_s"], \
-        "player speed field max {:.1f} -- not m/s?".format(np.nanmax(speeds))
 
     half = half_index(game, n_frames)
     blocks = block_spans(game, n_frames)
@@ -552,7 +566,7 @@ def report_summary(df, info, cfg):
          (g["nearest_team"] == 1).sum() / max(1, (g["nearest_team"] >= 0).sum()), "30-70%"),
         ("ball outside pitch", (g["ball_out_m"] > 0).mean(), "small"),
         ("ball median speed m/s", g["ball_speed"].median(), "~3-10"),
-        ("player median speed m/s", g["all_mean_speed"].median(), "~1-3"),
+        ("player median speed m/s (from positions)", g["all_mean_speed"].median(), "~1-3"),
         ("ball p99 speed m/s", g["ball_speed"].quantile(0.99), "< ~40"),
         ("frames w/ implausible track velocity", (g["n_implausible_velocity"] > 0).mean(),
          "small"),

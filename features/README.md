@@ -22,7 +22,7 @@ Reads the tactical ATD, its metadata and the Smart Tagging from `data/` (or `MTA
 | meta | `frame`, `half` (0 = ungraded), `graded` |
 | ball | `ball_seen`, `ball_interp`, `ball_x_m`, `ball_y_m`, `ball_gap_len`, `ball_since_seen`, `ball_until_seen`, `ball_vx`, `ball_vy`, `ball_speed`, `ball_accel`, `ball_turn_deg`, `ball_still_frac`, `ball_out_m` (> 0 outside the pitch), `ball_raw_f2…` (undocumented raw fields, kept as-is), `ball_dist_centre_m` |
 | team (`h_` / `a_`) | `n_tracked`, `cx_m`, `cy_m`, `std_x_m`, `std_y_m`, `spread_m`, `mean_speed`, `walking_frac`, `adv_x_m`, `adv_vx` (along the team's attacking direction), `own_half_frac`, `dmin_ball_m`, `d2_ball_m`, `n_within_{3,10}m` |
-| cross | `nearest_team` (0 H, 1 A, -1 none), `nearest_margin_m` (> 0 = home closer), `nearest_free_space_m`, `all_mean_speed`, `all_walking_frac`, `n_tracked`, `n_implausible_velocity` |
+| cross | `nearest_team` (0 H, 1 A, -1 none), `nearest_margin_m` (> 0 = home closer), `nearest_free_space_m`, `all_mean_speed`, `all_walking_frac`, `n_tracked`, `n_tracked_no_speed` (raw speed field NaN while the position is present), `n_implausible_velocity` |
 | Smart Tagging | `st_<code>_<H/A/NA>`: true while that tag is active |
 
 ## Conventions
@@ -30,6 +30,7 @@ Reads the tactical ATD, its metadata and the Smart Tagging from `data/` (or `MTA
 - **Units:** metres and m/s. Normalised x runs along the pitch length (105.3 m) and y along the width (68.0 m). The orientation is checked at both kickoffs, and the script stops if it doesn't hold.
 - **Attack direction:** read off the kickoff formation, and checked to flip at halftime.
 - **Velocities:** central difference over ±`velocity_half_window_frames`.
+- **Player speed and walking:** `mean_speed`, `walking_frac` and `adv_vx` come from position velocity (jump-filtered, see below), not the raw speed field, and are NaN where the ±k window leaves the half.
 - **Player identity switches:** a per-track velocity above `player_max_plausible_speed_m_s` is set to NaN and counted in `n_implausible_velocity`.
 - **Ball gaps:** a gap is filled linearly only if it is at most `ball_max_interp_gap_frames` long and the ball is seen on both sides. Nothing is filled across a half boundary.
 - **Thresholds:** every one is in `config.json`; there are no defaults in the code.

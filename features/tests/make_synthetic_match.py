@@ -31,6 +31,7 @@ EVENTS = {
     "still": (23000, 23300),            # ball static
     "nearest": (24000, 24100, 1.0, 4.0),  # home player 1 m from ball, away 4 m
     "runner": (25000, 26000, 5.0),      # home slot 0 runs +x at 5 m/s
+    "jump": (27000, 10.0),              # away slot 0 jumps -10 m for one frame (identity switch)
 }
 
 
@@ -56,7 +57,7 @@ def build_arrays():
         if not home_left:
             hx, ax_ = 1 - hx, 1 - ax_
         hy = rng.uniform(0.1, 0.9, 11); ay = rng.uniform(0.1, 0.9, 11)
-        sl = slice(first - 30, last + 1)  # players present slightly before the half starts
+        sl = slice(first - 30, last + 31)  # players present 30 frames before and after the half
         px[sl, :11] = hx; py[sl, :11] = hy
         px[sl, S_HOME:S_HOME + 11] = ax_; py[sl, S_HOME:S_HOME + 11] = ay
         ps[sl, :11] = 3.0; ps[sl, S_HOME:S_HOME + 11] = 3.0
@@ -86,6 +87,9 @@ def build_arrays():
     a, b, v = EVENTS["runner"]
     px[a:b, 0] = (10.0 + v * np.arange(b - a) / 25.0) / LENGTH; py[a:b, 0] = 0.2
     ps[a:b, 0] = v  # raw speed field in m/s, consistent with the positions (speed-unit check)
+
+    t, dx = EVENTS["jump"]
+    px[t, S_HOME] -= dx / LENGTH
     return px, py, ps, ball
 
 

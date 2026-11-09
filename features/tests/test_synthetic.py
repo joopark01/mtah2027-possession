@@ -6,11 +6,19 @@
 
 import json
 import os
+import pathlib
 import sys
 
 import numpy as np
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+# This test prints frame-level values, so it must never run on the provided match. Not an assert
+# (stripped by -O); casefolded because macOS paths are case-insensitive. Unset -> KeyError;
+# empty is refused too, since games.DATA_DIR falls back to ./data on an empty value.
+_real = str(pathlib.Path(HERE, "..", "..", "data").resolve()).casefold()
+_dir = os.environ["MTAH_DATA_DIR"]
+if not _dir or str(pathlib.Path(_dir).resolve()).casefold() == _real:
+    raise SystemExit("MTAH_DATA_DIR is empty or points at the real data/ dir; synthetic match only")
 sys.path.insert(0, os.path.dirname(HERE))
 sys.path.insert(0, HERE)
 import extract_features as ef  # noqa: E402
@@ -134,3 +142,40 @@ assert got["n_samples"] == 6 and abs(got["ratio"] - 3.6) < 1e-12, got  # t = 3..
 got = ef.speed_unit_ratio(one, one * 0.3, np.zeros_like(one), h, 1, 2.0)
 assert got["n_samples"] == 0 and np.isnan(got["ratio"]), got  # nobody moving
 print("all speed-unit checks passed")
+
+# -- speed features come from position velocity, not the raw speed field -------------------------
+# Runner window: home slot 0 moves at v, every other player is static. The raw field says 3.0 for
+# the static players and v for the runner, so raw-field features would read 35/11 and 0.
+a, b, v = EVENTS["runner"]
+r = df.iloc[a + 10:b - 10]
+close("h_mean_speed, one runner (position)", r["h_mean_speed"], v / 11.0, 1e-3)
+close("h_walking_frac, one runner", r["h_walking_frac"], 10 / 11.0, 1e-6)
+close("a_mean_speed, all static", r["a_mean_speed"], 0.0, 1e-6)
+close("a_walking_frac, all static", r["a_walking_frac"], 1.0, 0)
+close("all_mean_speed, one runner", r["all_mean_speed"], v / 22.0, 1e-3)
+close("all_walking_frac, one runner", r["all_walking_frac"], 21 / 22.0, 1e-6)
+# One-frame 10 m jump of away slot 0 at t: window ends hit it at t-k and t+k (62.5 m/s there).
+t, dx = EVENTS["jump"]
+close("n_implausible_velocity at t-k, t+k", df["n_implausible_velocity"].iloc[[t - K, t + K]], 1, 0)
+close("n_implausible_velocity elsewhere near jump",
+      df["n_implausible_velocity"].iloc[np.r_[t - 3 * K:t - K, t - K + 1:t + K, t + K + 1:t + 3 * K]],
+      0, 0)
+close("a_mean_speed around jump (jump excluded)", df["a_mean_speed"].iloc[t - 3 * K:t + 3 * K], 0.0, 1e-6)
+close("all_mean_speed around jump", df["all_mean_speed"].iloc[t - 3 * K:t + 3 * K], 0.0, 1e-6)
+close("a_walking_frac around jump", df["a_walking_frac"].iloc[t - 3 * K:t + 3 * K], 1.0, 0)
+# Half boundaries: players exist from first-30 to last+30, so without the same-half mask the first
+# and last k frames of each half would get a finite (0) speed from a window leaving the half.
+# adv_vx shares the masked velocity, so it must be NaN at exactly the same edges.
+cols = ["h_mean_speed", "a_mean_speed", "all_mean_speed",
+        "h_walking_frac", "a_walking_frac", "all_walking_frac", "h_adv_vx", "a_adv_vx"]
+for hh, first, last in ef.half_video_blocks("BAR-ATH"):
+    edge = np.r_[first - 5:first + K, last - K + 1:last + 3]
+    assert df[cols].iloc[edge].isna().all().all(), "half {}: speed finite at a boundary".format(hh)
+    assert df[cols].iloc[[first + K, last - K]].notna().all().all(), \
+        "half {}: speed NaN one frame inside the boundary".format(hh)
+    print("  ok  half {} speed NaN on [{}, {}) and [{}, {}], finite at {} and {}".format(
+        hh, first - 5, first + K, last - K + 1, last + 2, first + K, last - K))
+assert df[cols].iloc[100000].isna().all()  # halftime
+got = ef.same_half_window(np.array([0, 0, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2], dtype=np.int8), 1)
+assert got.tolist() == [False] * 3 + [True] * 4 + [False] * 2 + [True] * 2 + [False], got
+print("all position-speed checks passed")

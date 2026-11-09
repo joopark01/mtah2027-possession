@@ -7,17 +7,19 @@ All of these come from the provided tracking and Smart Tagging only, with no gro
 - **Missing speeds:** 1.63 tracked slots per frame have a position but no speed. Speed features should use velocity computed from positions, not the raw speed field.
 - **Nearest player** (when the ball position is known): home 56.4%, away 43.6%.
 - **Ball outside the pitch:** 2.5% of graded frames.
-- **Speeds:** ball median 5.1 m/s, p99 24.8; player median 1.5 m/s.
+- **Speeds:** ball median 5.1 m/s, p99 24.8; player median 1.47 m/s (from position velocity; 1.52 from the raw speed field, superseded 2026-11-09).
 - **`ball_raw_f2` is undocumented.** Range 0–7.3, median 1.31. Don't use it until confirmed. (For comparison, IDSSE's ball z is in metres.)
 - **The ball vanishes in long blocks, not flickers.** There are 150 missing runs; 132 of them are over 5 s and hold 99.7% of missing frames. Gap interpolation fills only 51 frames.
 
 ## 2026-11-09: what happens while the ball is missing (`diagnose_ball_gaps.py`)
 132 long gaps cover 64,446 frames (40.6% of graded). Median length 11.6 s, longest 221.5 s.
 
+Player speed and walking rows use position velocity (jump-filtered, masked at half edges), re-run 2026-11-09. The raw-speed-field version gave 0.95 / 0.60 walking and 1.04 / 2.00 m/s.
+
 | | gap | ball seen |
 |---|---|---|
-| share of players walking (median) | **0.95** | 0.60 |
-| mean player speed (median) | **1.04 m/s** | 2.00 m/s |
+| share of players walking (median) | **0.95** | 0.62 |
+| mean player speed (median) | **1.00 m/s** | 1.93 m/s |
 | inside any set-piece tag | 21.7% | 31.7% |
 | inside a `goals` tag (H + A) | **22.6%** | 2.1% |
 
