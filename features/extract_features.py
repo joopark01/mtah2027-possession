@@ -307,6 +307,7 @@ def team_and_cross_features(players, team, ball_x, ball_y, half, signs, pitch, c
     vy[k:-k] = (py[2 * k:] - py[:-2 * k]) / (2.0 * k / fps)
     implausible = np.hypot(vx, vy) > cfg["player_max_plausible_speed_m_s"]
     vx[implausible] = np.nan; vy[implausible] = np.nan
+    speed_check = speed_unit_ratio(ps, vx, vy, half, k, cfg["speed_unit_check_moving_m_s"])
 
     # Attack direction per frame for HOME; away is the opposite. 0 outside the halves.
     home_sign = np.zeros(len(px))
@@ -378,7 +379,24 @@ def team_and_cross_features(players, team, ball_x, ball_y, half, signs, pitch, c
         "n_implausible_velocity": implausible.sum(axis=1).astype(np.int16),
         "ball_dist_centre_m": np.hypot(ball_x - centre_x, ball_y - width / 2.0),
     })
-    return feats
+    return feats, speed_check
+
+
+def speed_unit_ratio(ps, vx, vy, half, k, moving_m_s):
+    """Median of raw speed field / position speed over moving player-frames. Label-free unit check.
+
+    ps, vx, vy [N, S]; position speed is the per-slot central difference (implausible jumps
+    already NaN). A sample counts only if t-k, t and t+k are all in the same graded half, both
+    speeds are finite and the position speed exceeds moving_m_s. Returns (ratio or NaN, n).
+    """
+    assert ps.shape == vx.shape == vy.shape and ps.shape[0] == len(half)
+    pos_speed = np.hypot(vx, vy)
+    same = np.zeros(len(half), dtype=bool)
+    same[k:-k] = (half[k:-k] > 0) & (half[:-2 * k] == half[k:-k]) & (half[2 * k:] == half[k:-k])
+    use = same[:, None] & np.isfinite(ps) & np.isfinite(pos_speed) & (pos_speed > moving_m_s)
+    n = int(use.sum())
+    ratio = float(np.median(ps[use] / pos_speed[use])) if n else float("nan")
+    return {"ratio": ratio, "n_samples": n}
 
 
 def smart_tagging_features(path, n_frames, cfg):
@@ -470,8 +488,9 @@ def build(game, data_dir, cfg, use_cache):
     print("  home attacks {} x in half 1, {} x in half 2".format(
         "+" if signs[1] > 0 else "-", "+" if signs[2] > 0 else "-"))
     assert signs[1] == -signs[2], "teams did not switch ends at halftime -- check kickoff frames"
-    feats.update(team_and_cross_features(players, team, feats["ball_x_m"], feats["ball_y_m"],
-                                         half, signs, pitch, cfg))
+    team_feats, speed_check = team_and_cross_features(players, team, feats["ball_x_m"],
+                                                      feats["ball_y_m"], half, signs, pitch, cfg)
+    feats.update(team_feats)
 
     st_path = require(["smart_tagging"], game, data_dir)[0]
     feats.update(smart_tagging_features(st_path, n_frames, cfg))
@@ -483,7 +502,8 @@ def build(game, data_dir, cfg, use_cache):
     floats = df.select_dtypes("float64").columns
     df[floats] = df[floats].astype(np.float32)
     inputs = [file_fingerprint(p) for p in (meta_path, raw_path, st_path)]
-    return df, {"attack_sign_home": signs, "teams": names, "inputs": inputs}
+    return df, {"attack_sign_home": signs, "teams": names, "inputs": inputs,
+                "speed_unit_check": speed_check}
 
 
 def provenance(cfg, info, out_path):
@@ -502,7 +522,15 @@ def provenance(cfg, info, out_path):
     }
 
 
-def report_summary(df):
+def speed_unit_verdict(ratio, tol):
+    """Interpretation only, never used for conversion: m/s, km/h or unknown."""
+    for unit, ref in (("m/s", 1.0), ("km/h", 3.6)):
+        if abs(ratio / ref - 1) <= tol:
+            return unit
+    return "unknown"
+
+
+def report_summary(df, info, cfg):
     """Label-free sanity summary over the graded halves.
 
     Deliberately reads NO ground truth, public or private: under the organisers' 2026-11-03
@@ -555,6 +583,14 @@ def report_summary(df):
             c, v.nunique(), v.min(), v.median(), v.quantile(0.99), v.max()))
     st = [c for c in df.columns if c.startswith("st_")]
     print("  smart tagging columns: {}".format(len(st)))
+    # Unit of the raw per-player speed field (players[:, :, 2]): compare with position speed.
+    sc = info["speed_unit_check"]
+    print("  raw player speed / position speed (median, moving > {:g} m/s, within a half): "
+          "{:.3f} over {} player-frames".format(cfg["speed_unit_check_moving_m_s"], sc["ratio"],
+                                                sc["n_samples"]))
+    print("    interpretation (~1 = m/s, ~3.6 = km/h, else unknown; tol {:.0%}): {}".format(
+        cfg["speed_unit_check_tolerance"],
+        speed_unit_verdict(sc["ratio"], cfg["speed_unit_check_tolerance"])))
 
 
 def main():
@@ -580,7 +616,7 @@ def main():
     print("\nwrote {}  ({} rows x {} cols, {:.1f} MB)".format(
         out, len(df), df.shape[1], os.path.getsize(out) / 1e6))
     if args.report:
-        report_summary(df)
+        report_summary(df, info, cfg)
 
 
 if __name__ == "__main__":

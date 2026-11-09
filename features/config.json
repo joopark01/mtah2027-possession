@@ -15,6 +15,8 @@
   "player_max_plausible_speed_m_s": 12.5,
   "player_walking_speed_m_s": 2.0,
   "near_ball_radii_m": [3.0, 10.0],
+  "speed_unit_check_moving_m_s": 2.0,
+  "speed_unit_check_tolerance": 0.10,
 
   "smart_tagging_team_map": {"Barcelona": "H", "Atletic Club": "A", "N/A": "NA"},
 
@@ -96,6 +98,18 @@
       "reason": "Counts of players within playing distance (3 m) and within the restart exclusion distance (10 m, just above 9.15 m) of the ball.",
       "tuned_on": null,
       "revisit": "3 m radius: tune on external matches"
+    },
+    "speed_unit_check_moving_m_s": {
+      "basis": "a_priori",
+      "source": "design choice; same value as MOVING_MPS in features/external/fetch_idsse.py",
+      "reason": "Report-only check of the raw player speed field's unit: only player-frames whose position speed exceeds 2 m/s are used, well above position noise (a few cm per frame at 25 fps), so the ratio is not dominated by jitter on standing players. Affects no feature.",
+      "tuned_on": null
+    },
+    "speed_unit_check_tolerance": {
+      "basis": "a_priori",
+      "source": "design choice; same value as SPEED_RATIO_TOL in features/external/fetch_idsse.py",
+      "reason": "Report-only: the ratio is called m/s if within 10% of 1, km/h if within 10% of 3.6, else unknown. Only prints an interpretation line; nothing is asserted or converted.",
+      "tuned_on": null
     },
     "smart_tagging_team_map": {
       "basis": "published",

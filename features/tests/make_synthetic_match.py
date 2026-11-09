@@ -85,6 +85,7 @@ def build_arrays():
 
     a, b, v = EVENTS["runner"]
     px[a:b, 0] = (10.0 + v * np.arange(b - a) / 25.0) / LENGTH; py[a:b, 0] = 0.2
+    ps[a:b, 0] = v  # raw speed field in m/s, consistent with the positions (speed-unit check)
     return px, py, ps, ball
 
 

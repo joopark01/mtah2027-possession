@@ -117,3 +117,20 @@ print("all provenance checks passed")
 close("n_tracked mid-half (11 + 11 scripted players)", df["n_tracked"].iloc[30000], 22, 0)
 close("n_tracked_no_speed mid-half", df["n_tracked_no_speed"].iloc[30000], 0, 0)
 print("all tracked-count checks passed")
+
+# -- raw speed field unit check (report only) ----------------------------------------------------
+sc = info["speed_unit_check"]
+assert sc["n_samples"] > 900, sc  # the 5 m/s runner is the only moving player
+close("speed-unit ratio, synthetic field in m/s", sc["ratio"], 1.0, 1e-2)
+assert ef.speed_unit_verdict(sc["ratio"], CFG["speed_unit_check_tolerance"]) == "m/s"
+assert ef.speed_unit_verdict(3.6 * sc["ratio"], CFG["speed_unit_check_tolerance"]) == "km/h"
+assert ef.speed_unit_verdict(2.0, CFG["speed_unit_check_tolerance"]) == "unknown"
+assert ef.speed_unit_verdict(float("nan"), CFG["speed_unit_check_tolerance"]) == "unknown"
+# Half boundary: a window touching a different half (or half 0) must not contribute a sample.
+h = np.array([0, 0, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2], dtype=np.int8)
+one = np.full((len(h), 1), 5.0)
+got = ef.speed_unit_ratio(one * 3.6, one, np.zeros_like(one), h, 1, 2.0)
+assert got["n_samples"] == 6 and abs(got["ratio"] - 3.6) < 1e-12, got  # t = 3..6 and 9..10
+got = ef.speed_unit_ratio(one, one * 0.3, np.zeros_like(one), h, 1, 2.0)
+assert got["n_samples"] == 0 and np.isnan(got["ratio"]), got  # nobody moving
+print("all speed-unit checks passed")
