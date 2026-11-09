@@ -14,7 +14,7 @@ Fork of the organisers' repo (`upstream` = metrica-sports/more-than-a-hack-2027,
 - `features/diagnose_ball_gaps.py`: what happens while the ball is missing (aggregates only).
 - `features/external/fetch_idsse.py`: downloads the 7 IDSSE matches (CC BY 4.0, Bassek et al. 2025) to `external_data/idsse/` as compact npz files with per-frame ball alive/dead and owner labels. The raw XML is deleted after conversion.
 - `features/tests/`: synthetic-match tests. Run them after any change to the extractor:
-  `python features/tests/make_synthetic_match.py /tmp/synth && MTAH_DATA_DIR=/tmp/synth python features/tests/test_synthetic.py`
+  `python features/tests/make_synthetic_match.py /tmp/synth && MTAH_DATA_DIR=/tmp/synth python features/tests/test_synthetic.py && python features/tests/test_fetch_checks.py`
 
 ## State (2026-11-09)
 - **Feature table built on real data; parsing verified.** Ball seen 59.3%, tracked 20.49, matching DATA.md.
