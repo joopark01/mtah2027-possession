@@ -1,1 +1,1 @@
-{"permissions":{"deny":["Read(./data/**)","Edit(./data/**)","Write(./data/**)","Bash(cat data/*)","Bash(head data/*)","Bash(tail data/*)","Bash(less data/*)"]}}
+{"permissions":{"deny":["Read(./data/**)","Edit(./data/**)","Bash(cat data/*)","Bash(head data/*)","Bash(tail data/*)","Bash(less data/*)"]}}
