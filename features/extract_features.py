@@ -361,7 +361,11 @@ def team_and_cross_features(players, team, ball_x, ball_y, half, signs, pitch, c
     d_opp = np.where(opp, np.hypot(px - nx[:, None], py - ny[:, None]), np.nan)
     free = np.where(has, masked_min(d_opp, axis=1), np.nan)
 
-    all_speed, n_all = masked_mean(ps, axis=1)
+    all_speed, _ = masked_mean(ps, axis=1)
+    # Tracked = has a position. Speed can be missing on a tracked slot (e.g. a track's first
+    # frame), so counting speeds would undercount; that shortfall is reported separately.
+    n_all = (~np.isnan(px)).sum(axis=1)
+    n_no_speed = (~np.isnan(px) & np.isnan(ps)).sum(axis=1)
     all_walk, _ = masked_mean(np.where(np.isnan(ps), np.nan,
                                        (ps < cfg["player_walking_speed_m_s"]) * 1.0), axis=1)
     feats.update({
@@ -370,6 +374,7 @@ def team_and_cross_features(players, team, ball_x, ball_y, half, signs, pitch, c
         "nearest_free_space_m": free,
         "all_mean_speed": all_speed, "all_walking_frac": all_walk,
         "n_tracked": n_all.astype(np.int16),
+        "n_tracked_no_speed": n_no_speed.astype(np.int16),
         "n_implausible_velocity": implausible.sum(axis=1).astype(np.int16),
         "ball_dist_centre_m": np.hypot(ball_x - centre_x, ball_y - width / 2.0),
     })
@@ -511,8 +516,12 @@ def report_summary(df):
         ("ball seen (raw)", g["ball_seen"].mean(), "59.3% (DATA.md)"),
         ("ball seen or interpolated", (g["ball_seen"] | g["ball_interp"]).mean(), "> raw"),
         ("mean tracked objects", g["n_tracked"].mean(), "20.5 (DATA.md)"),
-        ("nearest player is home", (g["nearest_team"] == 0).mean(), "30-70%"),
-        ("nearest player is away", (g["nearest_team"] == 1).mean(), "30-70%"),
+        ("tracked slots with no speed (mean)", g["n_tracked_no_speed"].mean(), "~0"),
+        # share of frames that HAVE a nearest player (ball position known); the two sum to 100%
+        ("nearest player is home | ball known",
+         (g["nearest_team"] == 0).sum() / max(1, (g["nearest_team"] >= 0).sum()), "30-70%"),
+        ("nearest player is away | ball known",
+         (g["nearest_team"] == 1).sum() / max(1, (g["nearest_team"] >= 0).sum()), "30-70%"),
         ("ball outside pitch", (g["ball_out_m"] > 0).mean(), "small"),
         ("ball median speed m/s", g["ball_speed"].median(), "~3-10"),
         ("player median speed m/s", g["all_mean_speed"].median(), "~1-3"),
@@ -524,11 +533,26 @@ def report_summary(df):
         shown = "{:.1%}".format(value) if expect.endswith("%") or name.startswith(
             ("ball seen", "nearest", "ball outside", "frames")) else "{:.2f}".format(value)
         print("  {:<40} {:>8}   expect {}".format(name, shown, expect))
+    # Ball gaps: how many missing runs inside the graded halves are short enough to interpolate.
+    lengths = []
+    for _, half_rows in g.groupby("half"):  # per half, so no run joins across halftime
+        missing = (~half_rows["ball_seen"].values).astype(np.int8)
+        edges = np.diff(np.concatenate(([0], missing, [0])))
+        lengths.append(np.flatnonzero(edges == -1) - np.flatnonzero(edges == 1))
+    lengths = np.concatenate(lengths)
+    print("  ball-missing runs in graded frames: {}".format(len(lengths)))
+    for lo, hi in ((1, 12), (13, 25), (26, 125), (126, 10 ** 9)):
+        sel = (lengths >= lo) & (lengths <= hi)
+        print("    {:>4}-{:<5} frames: {:>6} runs, {:>6.1%} of missing frames".format(
+            lo, hi if hi < 10 ** 9 else "inf", int(sel.sum()),
+            lengths[sel].sum() / max(1, lengths.sum())))
+    print("  frames filled by interpolation: {}".format(int(g["ball_interp"].sum())))
     extra = [c for c in df.columns if c.startswith("ball_raw_f")]
     print("  extra raw ball fields: {}".format(extra or "none"))
     for c in extra:
-        print("    {}: {} distinct values, e.g. {}".format(
-            c, g[c].nunique(), sorted(g[c].dropna().unique())[:6]))
+        v = g[c].dropna()
+        print("    {}: {} distinct, min {:.4f}, median {:.4f}, p99 {:.4f}, max {:.4f}".format(
+            c, v.nunique(), v.min(), v.median(), v.quantile(0.99), v.max()))
     st = [c for c in df.columns if c.startswith("st_")]
     print("  smart tagging columns: {}".format(len(st)))
 

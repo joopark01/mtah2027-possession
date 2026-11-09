@@ -112,3 +112,8 @@ refused(lambda c: c["_provenance"]["fps"].update(basis="tuned_external", tuned_o
 refused(lambda c: c["_provenance"]["fps"].update(basis="tuned_external", tuned_on="BAR-ATH public"),
         "tuning on the provided game")
 print("all provenance checks passed")
+
+# -- tracked count is by position, not by speed --------------------------------------------------
+close("n_tracked mid-half (11 + 11 scripted players)", df["n_tracked"].iloc[30000], 22, 0)
+close("n_tracked_no_speed mid-half", df["n_tracked_no_speed"].iloc[30000], 0, 0)
+print("all tracked-count checks passed")
