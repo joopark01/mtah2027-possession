@@ -6,6 +6,7 @@ Fork of the organisers' repo (`upstream` = metrica-sports/more-than-a-hack-2027,
 - **Never read, print or summarise rows of anything under `data/`.** Claude Code is an AI service, and uploading the provided data to AI services is forbidden. Run scripts that read the data and look only at their aggregate summaries. Never `cat`/`head` data files or open the parquet/npz/csv outputs. `.claude/settings.json` blocks direct reads, but it can't block everything.
 - **No training, fitting or tuning on the ground truth or the video.** Every parameter is published, follows from the Laws of the Game or physics, is chosen a priori, or is tuned on **external** data only (IDSSE). `features/config.json` `_provenance` records which, and `check_provenance()` enforces it.
 - No hand labels on BAR-ATH, and no checking our output against the video.
+- **IDSSE split (fixed 2026-11-09, before any results):** tune on J03WMX, J03WN1, J03WOH, J03WOY, J03WQQ. Hold out J03WPY, J03WR9: evaluate on them only, never tune or select on them.
 - **Exception:** external data lives in `external_data/` (gitignored, outside `data/` on purpose) and may be read normally. Never put external data under `data/`.
 
 ## Where things are
