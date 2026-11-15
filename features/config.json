@@ -5,6 +5,7 @@
   "kickoff_video_frames": {"1": 11185, "2": 113742},
   "kickoff_window_frames": 25,
   "kickoff_min_centroid_separation_m": 5.0,
+  "kickoff_window_side": {"BAR-ATH": "before", "IDSSE": "after"},
 
   "ball_max_interp_gap_frames": 12,
   "velocity_half_window_frames": 2,
@@ -36,7 +37,13 @@
     "kickoff_window_frames": {
       "basis": "law_of_game",
       "source": "IFAB Laws of the Game, Law 8 (The Start and Restart of Play)",
-      "reason": "At a kickoff every player must be in their own half. Averaging positions over the 1 s (25 frames) before the kickoff reads each team's side robustly against single-frame tracking noise. Used only to find attacking direction.",
+      "reason": "At a kickoff every player must be in their own half. Averaging positions over the 26 rows (k-25..k or k..k+25, about 1 s) next to the kickoff (side: kickoff_window_side) reads each team's side robustly against single-frame tracking noise. Used only to find attacking direction.",
+      "tuned_on": null
+    },
+    "kickoff_window_side": {
+      "basis": "published",
+      "source": "data format: BAR-ATH tracking runs before each kickoff; IDSSE positions start at (or just before) each kickoff, so idsse_features.py takes the first alive row (DFL BallStatus) of each period as the kickoff and asserts the resulting signs agree with kloppy's orientation",
+      "reason": "Which side of the kickoff the attack-direction window sits on. BAR-ATH tracking runs before each kickoff, so the 1 s before it is used, when every player is in their own half by law. On IDSSE the rows before a period's first alive row are either the other period or dead pre-kickoff rows with no guaranteed formation, so the 1 s after the first alive row is used instead. In 1 s a centroid moves at most a few metres, far less than the half-pitch separation, and the 5 m separation assert still guards the result.",
       "tuned_on": null
     },
     "kickoff_min_centroid_separation_m": {

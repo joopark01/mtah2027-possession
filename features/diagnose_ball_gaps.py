@@ -157,6 +157,21 @@ def main():
                           df["ball_y_m"].values[j] - df["ball_y_m"].values[i]) for i, j in pairs]
             print("  distance between vanish and reappear points, m: {}".format(q(d)))
 
+    print("\n5) where h_/a_walking_frac is NaN (graded frames)")
+    for col in ("h_walking_frac", "a_walking_frac"):
+        nan = graded & df[col].isna().values
+        n_nan = int(nan.sum())
+        print("  {}: {} NaN frames ({:.2%} of graded)".format(col, n_nan, n_nan / graded.sum()))
+        if not n_nan:
+            continue
+        print("    inside long gaps {:.1%}, ball seen {:.1%}, other (short gaps) {:.1%}".format(
+            (nan & gap).sum() / n_nan, (nan & seen).sum() / n_nan,
+            (nan & ~gap & ~seen).sum() / n_nan))
+        edges = np.diff(np.concatenate(([0], nan.astype(np.int8), [0])))
+        runs_nan = np.flatnonzero(edges == -1) - np.flatnonzero(edges == 1)
+        print("    {} runs, longest {:.1f} s, median {:.2f} s".format(
+            len(runs_nan), runs_nan.max() / FPS, np.median(runs_nan) / FPS))
+
 
 if __name__ == "__main__":
     main()

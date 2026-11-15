@@ -30,3 +30,18 @@ Player speed and walking rows use position velocity (jump-filtered, masked at ha
 **Interpretation:** the long gaps are overwhelmingly stoppages. The tracker loses the ball while it is dead and picks it up again once it is played, so **reappearance ≈ the restart**. A minority of gaps (lower quartile of walking share, 0.86) may still be live play.
 
 **Consequence:** build the dead-ball detector before the broadcast alignment.
+
+## 2026-11-15: where team walking share is NaN (`diagnose_ball_gaps.py` section 5)
+Re-run on 2026-11-15; the numbers above reproduced exactly.
+- `h_walking_frac` is NaN on 755 graded frames (0.48%). Of these, 74.8% are inside long ball gaps, 24.6% are ball-seen frames and 0.5% are short gaps. There are 4 runs; the longest is 30.0 s and the median 0.08 s.
+- `a_walking_frac` is NaN on 8 frames (4 runs, longest 0.1 s).
+- **Consequence:** `a_` has 4 runs of 2 frames each, which matches the half edges (±k masking). `h_` also has 4 runs, so its 30 s run probably joins one of those edges and is mostly inside a stoppage (likely the 2nd-half pre-kickoff stretch from 110808 to 113742; not checked further). The dead-ball detector must treat a NaN walking share as unknown, not as "not walking", and fall back to `all_walking_frac`.
+
+# Findings on IDSSE (external, Bassek et al. 2025, CC BY 4.0)
+
+## 2026-11-15: adapter (`features/external/idsse_features.py`)
+- **Kickoff = first alive row of the period, not its first row.** Periods can open with dead rows (J03WOH period 2: 48 rows, ball 51 m from the spot). At the first alive row the ball is 0.2–10.1 m from the centre spot, because DFL data can start just after the kick. The attack signs agree with kloppy's orientation on all 7 matches, and this is asserted. That is a wiring check, not independent confirmation: kloppy uses the same centroid comparison on period 1's first frame. The kickoff rule is a data-format decision checked on all 7 matches, not a parameter selected on the held-out pair.
+- **D share is 41–52%** (DFL BallStatus). Label runs: 462–614 per match, of which 5–16 are shorter than 5 frames. This is the flicker floor of the proxy labels.
+- **Ball z (`ball_raw_f2`) on IDSSE is metres:** median 0.0–0.09, p99 about 9, max 27. Do not compare it with BAR-ATH's f2, which is undocumented.
+- **Proxy mismatch (known risk):** DFL defines alive/dead timing and possession hand-over its own way, and that may differ from the organisers' GT (whistle vs line crossing; touch vs control). Boundary placement tuned on IDSSE inherits DFL's convention.
+- The period seam joins rows a halftime apart. Ball kinematics, stillness and jump counts are now masked at every block edge (in the shared extractor). Anything temporal on IDSSE must split on `half`.

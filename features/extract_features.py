@@ -209,21 +209,18 @@ def interpolate_gaps(values, seen, max_gap, blocks):
     return out, filled
 
 
-def block_spans(game, n_frames):
-    """Half-open spans [pre, 1st half, halftime, 2nd half, post]: interpolation never crosses."""
-    halves = half_video_blocks(game)
-    cuts = [0]
-    for _, first, last in halves:
-        cuts += [first, last + 1]
-    cuts.append(n_frames)
-    return [(a, b) for a, b in zip(cuts[:-1], cuts[1:]) if b > a]
+def block_spans(half):
+    """Half-open spans of constant half index (pre, 1st half, halftime, ...): interpolation never
+    crosses one."""
+    cuts = np.concatenate(([0], np.flatnonzero(np.diff(half)) + 1, [len(half)]))
+    return list(zip(cuts[:-1].tolist(), cuts[1:].tolist()))
 
 
 # -- feature blocks -----------------------------------------------------------------------------
 
-def ball_features(ball_raw, pitch, blocks, cfg):
+def ball_features(ball_raw, pitch, blocks, fps, cfg):
     length, width = pitch
-    fps, k = cfg["fps"], cfg["velocity_half_window_frames"]
+    k = cfg["velocity_half_window_frames"]
     seen = ~np.isnan(ball_raw[:, 0]) & ~np.isnan(ball_raw[:, 1])
     x_raw = ball_raw[:, 0].astype(np.float64) * length
     y_raw = ball_raw[:, 1].astype(np.float64) * width
@@ -231,7 +228,11 @@ def ball_features(ball_raw, pitch, blocks, cfg):
     y, _ = interpolate_gaps(y_raw, seen, cfg["ball_max_interp_gap_frames"], blocks)
     gap, since, until = run_lengths_of_missing(seen)
 
+    # Nothing spans a block edge (half start/end; on IDSSE the period seam joins rows a halftime
+    # apart): velocity is NaN unless t-k, t, t+k share a block, and accel/turn inherit that.
+    in_block = same_window(block_ids(blocks, len(x)), k)
     vx, vy = central_diff(x, k, fps), central_diff(y, k, fps)
+    vx[~in_block] = np.nan; vy[~in_block] = np.nan
     speed = np.hypot(vx, vy)
     ax, ay = central_diff(vx, k, fps), central_diff(vy, k, fps)
 
@@ -242,7 +243,7 @@ def ball_features(ball_raw, pitch, blocks, cfg):
     inx[k:] = x[k:] - x[:-k]; iny[k:] = y[k:] - y[:-k]
     outx[:-k] = x[k:] - x[:-k]; outy[:-k] = y[k:] - y[:-k]
     min_disp = cfg["turn_min_speed_m_s"] * k / fps
-    ok = (np.hypot(inx, iny) > min_disp) & (np.hypot(outx, outy) > min_disp)
+    ok = in_block & (np.hypot(inx, iny) > min_disp) & (np.hypot(outx, outy) > min_disp)
     cos = np.full(len(x), np.nan)
     cos[ok] = ((inx * outx + iny * outy)[ok]
                / (np.hypot(inx, iny) * np.hypot(outx, outy))[ok])
@@ -253,7 +254,10 @@ def ball_features(ball_raw, pitch, blocks, cfg):
     still = (speed < cfg["ball_still_speed_m_s"]).astype(np.float64)
     known = (~np.isnan(speed)).astype(np.float64)
     cs = np.concatenate(([0.0], np.cumsum(still))); ck = np.concatenate(([0.0], np.cumsum(known)))
-    i = np.arange(len(x)); lo = np.maximum(0, i - h); hi = np.minimum(len(x), i + h + 1)
+    start = np.zeros(len(x), dtype=np.int64); stop = start.copy()
+    for a, b in blocks:
+        start[a:b] = a; stop[a:b] = b
+    i = np.arange(len(x)); lo = np.maximum(start, i - h); hi = np.minimum(stop, i + h + 1)
     n_known = ck[hi] - ck[lo]
     still_frac = np.divide(cs[hi] - cs[lo], n_known, out=np.full(len(x), np.nan),
                            where=n_known > 0)
@@ -277,13 +281,21 @@ def ball_features(ball_raw, pitch, blocks, cfg):
     return feats
 
 
-def attack_signs(px_m, team, cfg):
-    """{half: +1/-1 for HOME attacking toward +x}. Read off the kickoff formation."""
+def attack_signs(px_m, team, kickoff_rows, side, cfg):
+    """{half: +1/-1 for HOME attacking toward +x}. Read off the kickoff formation.
+
+    kickoff_rows {1: row, 2: row}. side "before" averages rows [k - w, k] (BAR-ATH: tracking runs
+    before the kickoff); "after" averages [k, k + w] (IDSSE: each period starts at its kickoff, so
+    the rows before it belong to the other period or do not exist). w = kickoff_window_frames.
+    """
+    assert side in ("before", "after"), side
     signs = {}
     w = cfg["kickoff_window_frames"]
     for half in (1, 2):
-        k = cfg["kickoff_video_frames"][str(half)]
-        window = px_m[k - w:k + 1]
+        k = kickoff_rows[half]
+        lo, hi = (k - w, k + 1) if side == "before" else (k, k + w + 1)
+        assert 0 <= lo and hi <= len(px_m), "half {}: kickoff window leaves the array".format(half)
+        window = px_m[lo:hi]
         home_x, _ = masked_mean(window[:, team == HOME].reshape(-1), axis=0)
         away_x, _ = masked_mean(window[:, team == AWAY].reshape(-1), axis=0)
         sep = float(away_x - home_x)
@@ -294,9 +306,9 @@ def attack_signs(px_m, team, cfg):
     return signs
 
 
-def team_and_cross_features(players, team, ball_x, ball_y, half, signs, pitch, cfg):
+def team_and_cross_features(players, team, ball_x, ball_y, half, signs, pitch, fps, cfg):
     length, width = pitch
-    fps, k = cfg["fps"], cfg["velocity_half_window_frames"]
+    k = cfg["velocity_half_window_frames"]
     px = players[:, :, 0].astype(np.float64) * length
     py = players[:, :, 1].astype(np.float64) * width
     ps = players[:, :, 2].astype(np.float64)
@@ -306,12 +318,14 @@ def team_and_cross_features(players, team, ball_x, ball_y, half, signs, pitch, c
     vx[k:-k] = (px[2 * k:] - px[:-2 * k]) / (2.0 * k / fps)
     vy = np.full(py.shape, np.nan)
     vy[k:-k] = (py[2 * k:] - py[:-2 * k]) / (2.0 * k / fps)
-    implausible = np.hypot(vx, vy) > cfg["player_max_plausible_speed_m_s"]
+    # Only within a block: across the IDSSE period seam every player "jumps" (teams swap ends).
+    implausible = (np.hypot(vx, vy) > cfg["player_max_plausible_speed_m_s"]) & \
+        same_window(block_ids(block_spans(half), len(half)), k)[:, None]
     vx[implausible] = np.nan; vy[implausible] = np.nan
     # The central difference spans whatever frames sit at t +/- k, including halftime and
     # pre-kickoff, so velocity is NaN unless t-k, t and t+k are all in the same graded half
     # (frames outside the halves are NaN too). Masked after counting implausible jumps, so
-    # n_implausible_velocity still counts every jump; masked once, so speed, walking and adv_vx agree.
+    # n_implausible_velocity counts every within-block jump; masked once, so speed, walking and adv_vx agree.
     outside = ~same_half_window(half, k)
     vx[outside] = np.nan; vy[outside] = np.nan
     speed_check = speed_unit_ratio(ps, vx, vy, half, k, cfg["speed_unit_check_moving_m_s"])
@@ -393,12 +407,25 @@ def team_and_cross_features(players, team, ball_x, ball_y, half, signs, pitch, c
     return feats, speed_check
 
 
+def same_window(ids, k):
+    """[N] bool: t-k, t and t+k carry the same id."""
+    assert k >= 1 and ids.ndim == 1
+    same = np.zeros(len(ids), dtype=bool)
+    same[k:-k] = (ids[:-2 * k] == ids[k:-k]) & (ids[2 * k:] == ids[k:-k])
+    return same
+
+
+def block_ids(blocks, n):
+    """[N] int: index of the block_spans span each row is in."""
+    ids = np.empty(n, dtype=np.int64)
+    for j, (a, b) in enumerate(blocks):
+        ids[a:b] = j
+    return ids
+
+
 def same_half_window(half, k):
     """[N] bool: t-k, t and t+k all lie in the same graded half (half > 0)."""
-    assert k >= 1 and half.ndim == 1
-    same = np.zeros(len(half), dtype=bool)
-    same[k:-k] = (half[k:-k] > 0) & (half[:-2 * k] == half[k:-k]) & (half[2 * k:] == half[k:-k])
-    return same
+    return same_window(half, k) & (half > 0)
 
 
 def speed_unit_ratio(ps, vx, vy, half, k, moving_m_s):
@@ -442,6 +469,8 @@ def smart_tagging_features(path, n_frames, cfg):
 
 PROVENANCE_BASES = {"published", "law_of_game", "physics", "a_priori", "tuned_external"}
 PROVENANCE_FIELDS = {"basis", "source", "reason", "tuned_on"}
+IDSSE_TUNE = ("J03WMX", "J03WN1", "J03WOH", "J03WOY", "J03WQQ")  # fixed 2026-11-09, before any
+IDSSE_HOLDOUT = ("J03WPY", "J03WR9")                            # results (CLAUDE.md)
 
 
 def check_provenance(cfg):
@@ -466,6 +495,11 @@ def check_provenance(cfg):
             assert tuned, "{!r} is tuned_external but names no dataset".format(key)
             assert "BAR-ATH" not in str(tuned), \
                 "{!r} claims tuning on the provided game -- not allowed".format(key)
+            # IDSSE split (CLAUDE.md): before "held out", only the five tuning matches may appear
+            tuned_part = str(tuned).split("held out")[0]
+            named = {m for m in IDSSE_TUNE + IDSSE_HOLDOUT if m in tuned_part}
+            assert named <= set(IDSSE_TUNE), \
+                "{!r} names a held-out IDSSE match as tuning data".format(key)
         else:
             assert tuned is None, "{!r} has tuned_on but basis {!r}".format(key, entry["basis"])
 
@@ -477,6 +511,31 @@ def half_index(game, n_frames):
     for h, first, last in half_video_blocks(game):
         half[first:last + 1] = h
     return half
+
+
+def features_from_arrays(players, team, ball_raw, half, pitch, fps, kickoff_rows, kickoff_side,
+                         cfg):
+    """Tracking arrays -> feature columns. Shared by the provided match (build) and external
+    matches (features/external/idsse_features.py), so both go through identical code.
+
+    players [N, S, 3] (x_norm, y_norm, speed m/s), team [S], ball_raw [N, B] (x_norm, y_norm, ...),
+    half [N] (0 = not graded), pitch (length_m, width_m), kickoff_rows {1, 2} row indices.
+    Returns (feats dict, attack signs, speed-unit check).
+    """
+    for h, row in kickoff_rows.items():
+        assert half[row] == h, "kickoff row {} is in half {}, not {}".format(row, half[row], h)
+    feats = {"frame": np.arange(len(half), dtype=np.int32), "half": half, "graded": half > 0}
+    feats.update(ball_features(ball_raw, pitch, block_spans(half), fps, cfg))
+    signs = attack_signs(players[:, :, 0].astype(np.float64) * pitch[0], team, kickoff_rows,
+                         kickoff_side, cfg)
+    print("  home attacks {} x in half 1, {} x in half 2".format(
+        "+" if signs[1] > 0 else "-", "+" if signs[2] > 0 else "-"))
+    assert signs[1] == -signs[2], "teams did not switch ends at halftime -- check kickoff frames"
+    team_feats, speed_check = team_and_cross_features(players, team, feats["ball_x_m"],
+                                                      feats["ball_y_m"], half, signs, pitch, fps,
+                                                      cfg)
+    feats.update(team_feats)
+    return feats, signs, speed_check
 
 
 def build(game, data_dir, cfg, use_cache):
@@ -494,17 +553,11 @@ def build(game, data_dir, cfg, use_cache):
         ball_raw.shape[1]))
 
     half = half_index(game, n_frames)
-    blocks = block_spans(game, n_frames)
+    kickoffs = {h: cfg["kickoff_video_frames"][str(h)] for h in (1, 2)}
     print("computing features ...")
-    feats = {"frame": np.arange(n_frames, dtype=np.int32), "half": half, "graded": half > 0}
-    feats.update(ball_features(ball_raw, pitch, blocks, cfg))
-    signs = attack_signs(players[:, :, 0].astype(np.float64) * pitch[0], team, cfg)
-    print("  home attacks {} x in half 1, {} x in half 2".format(
-        "+" if signs[1] > 0 else "-", "+" if signs[2] > 0 else "-"))
-    assert signs[1] == -signs[2], "teams did not switch ends at halftime -- check kickoff frames"
-    team_feats, speed_check = team_and_cross_features(players, team, feats["ball_x_m"],
-                                                      feats["ball_y_m"], half, signs, pitch, cfg)
-    feats.update(team_feats)
+    feats, signs, speed_check = features_from_arrays(
+        players, team, ball_raw, half, pitch, cfg["fps"], kickoffs,
+        cfg["kickoff_window_side"]["BAR-ATH"], cfg)
 
     st_path = require(["smart_tagging"], game, data_dir)[0]
     feats.update(smart_tagging_features(st_path, n_frames, cfg))

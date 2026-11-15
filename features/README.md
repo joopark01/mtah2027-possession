@@ -53,11 +53,24 @@ Every value in `config.json` has an entry in its `_provenance` block with `basis
 
 The full block is copied into the provenance JSON written next to each output. Use it as the parameter table for the tech doc.
 
+## IDSSE features
+
+`features/external/idsse_features.py --all` (or a list of ids) turns each `external_data/idsse/<id>.npz` into `external_data/idsse_features/<id>.parquet`, plus `<id>_provenance.json`. It calls `extract_features.features_from_arrays`, so the features come from the same code as BAR-ATH. The data comes from Bassek, Rein, Weber et al., Sci Data 12, 195 (2025), CC BY 4.0. Differences from the BAR-ATH table:
+
+- There are no `st_` columns, because IDSSE has no Smart Tagging.
+- Every frame is graded.
+- `ball_raw_f2` is ball z in metres.
+- The extra `label` column holds H/A/D, from DFL BallStatus and BallPossession.
+
+This step only adapts the data. It does no degradation and no tuning.
+
 ## Tests (no real data needed)
 
 ```bash
 python features/tests/make_synthetic_match.py /tmp/synth
 MTAH_DATA_DIR=/tmp/synth python features/tests/test_synthetic.py
+python features/tests/test_fetch_checks.py      # IDSSE fetch checks
+python features/tests/test_idsse_features.py    # IDSSE feature adapter
 ```
 
 This builds a full-length fake match with scripted events and checks the extracted features against the known answers. The events cover:
