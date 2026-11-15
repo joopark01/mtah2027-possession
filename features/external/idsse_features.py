@@ -64,9 +64,14 @@ def label_runs(codes):
     return np.diff(cuts)
 
 
-def match_features(npz_path, json_path, cfg, kickoff_side):
-    """One IDSSE match -> (DataFrame, info). kickoff_side is passed in so the test can force it."""
-    d = np.load(npz_path)
+def match_features(npz_path, json_path, cfg, kickoff_side, ball_override=None):
+    """One IDSSE match -> (DataFrame, info). kickoff_side is passed in so the test can force it.
+    ball_override: optional [N, 3] ball array used instead of the npz ball (degrade_ball.py)."""
+    d = dict(np.load(npz_path))
+    if ball_override is not None:
+        assert ball_override.shape == d["ball"].shape, "ball_override shape {} != {}".format(
+            ball_override.shape, d["ball"].shape)
+        d["ball"] = ball_override
     with open(json_path) as f:
         meta = json.load(f)
     assert meta["fetch_version"] == FETCH_VERSION, "{}: fetch_version {} != {}, re-fetch".format(

@@ -28,6 +28,7 @@ sys.path.insert(0, ROOT)
 from games import GAME, GAMES  # noqa: E402
 
 FPS = 25
+KICKOFF_2ND_VIDEO_FRAME = 113742  # published: DATA.md, FAQ.md, features/config.json
 LONG_GAP_MIN_FRAMES = 126        # > 5 s: the bin holding 99.7% of missing frames on 2026-11-09
 EDGE_FRAMES = 25                 # 1 s window just before a gap starts / after it ends
 DURATION_BINS_S = [5, 10, 20, 40, 80, 160, 10 ** 6]
@@ -92,6 +93,16 @@ def main():
         lo, hi if hi < 10 ** 6 else "inf", c) for lo, hi, c in
         zip(DURATION_BINS_S[:-1], DURATION_BINS_S[1:], counts)))
     print("  median {:.1f} s, longest {:.1f} s".format(np.median(dur), dur.max()))
+    # 2nd half is graded before its kickoff (published); IDSSE periods start at kickoff, so a gap
+    # here has no IDSSE counterpart in the ball-loss simulation target.
+    ko2 = KICKOFF_2ND_VIDEO_FRAME
+    first2 = int(np.flatnonzero(df["half"].values == 2)[0])
+    pre = [(a, b) for a, b, _ in runs if a < ko2 and b > first2]
+    print("  runs overlapping the 2nd-half pre-kickoff span [{}, {}): {}  ({} frames, {:.1f} s; "
+          "{} frames inside the span)".format(
+              first2, ko2, len(pre), sum(b - a for a, b in pre),
+              sum(b - a for a, b in pre) / FPS,
+              sum(min(b, ko2) - max(a, first2) for a, b in pre)))
 
     print("\n1) are players walking?  quartiles (25% / median / 75%)")
     print("  {:<34} {:>20}   {:>20}".format("", "GAP", "SEEN (reference)"))

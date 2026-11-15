@@ -127,8 +127,28 @@ def main():
         raise AssertionError("check_provenance accepted a held-out match as tuning data")
     ok = json.loads(json.dumps(cfg))
     ok["_provenance"]["fps"].update(basis="tuned_external",
-                                    tuned_on="IDSSE J03WMX; held out J03WPY,J03WR9")
+                                    tuned_on="IDSSE J03WMX; held out J03WPY,J03WR9",
+                                    target="IDSSE DFL BallStatus")
     ef.check_provenance(ok)
+    no_target = json.loads(json.dumps(ok))
+    no_target["_provenance"]["fps"].pop("target")
+    try:
+        ef.check_provenance(no_target)
+    except AssertionError:
+        pass
+    else:
+        raise AssertionError("tuned_external without a target must be refused")
+    # gap bookkeeping must not run across a block edge
+    seen = np.array([1, 0, 0, 1, 0, 0, 0, 1, 0], dtype=bool)
+    blocks = [(0, 5), (5, 9)]
+    gap, since, until = (np.concatenate(p) for p in zip(
+        *(ef.run_lengths_of_missing(seen[a:b]) for a, b in blocks)))
+    bf = ef.ball_features(np.where(seen[:, None], 0.5, np.nan) * np.ones((9, 2)), (105.0, 68.0),
+                          blocks, FPS, cfg)
+    assert np.array_equal(bf["ball_gap_len"], gap, equal_nan=True)
+    assert np.isnan(bf["ball_gap_len"][4]) and np.isnan(bf["ball_until_seen"][4]), "edge run"
+    assert np.isnan(bf["ball_since_seen"][5]) and bf["ball_until_seen"][5] == 2
+    assert bf["ball_gap_len"][1] == 2
     print("test_idsse_features: all checks passed")
 
 

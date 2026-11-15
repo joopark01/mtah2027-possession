@@ -226,7 +226,9 @@ def ball_features(ball_raw, pitch, blocks, fps, cfg):
     y_raw = ball_raw[:, 1].astype(np.float64) * width
     x, filled = interpolate_gaps(x_raw, seen, cfg["ball_max_interp_gap_frames"], blocks)
     y, _ = interpolate_gaps(y_raw, seen, cfg["ball_max_interp_gap_frames"], blocks)
-    gap, since, until = run_lengths_of_missing(seen)
+    # per block, so no count runs across a half edge or the IDSSE period seam (NaN at block edges)
+    gap, since, until = (np.concatenate(parts) for parts in zip(
+        *(run_lengths_of_missing(seen[a:b]) for a, b in blocks)))
 
     # Nothing spans a block edge (half start/end; on IDSSE the period seam joins rows a halftime
     # apart): velocity is NaN unless t-k, t, t+k share a block, and accel/turn inherit that.
@@ -493,6 +495,9 @@ def check_provenance(cfg):
         tuned = entry["tuned_on"]
         if entry["basis"] == "tuned_external":
             assert tuned, "{!r} is tuned_external but names no dataset".format(key)
+            # what the objective matched, e.g. IDSSE labels, or BAR-ATH label-free tracking
+            # aggregates; must never be the GT or the video
+            assert entry.get("target"), "{!r} is tuned_external but states no target".format(key)
             assert "BAR-ATH" not in str(tuned), \
                 "{!r} claims tuning on the provided game -- not allowed".format(key)
             # IDSSE split (CLAUDE.md): before "held out", only the five tuning matches may appear
