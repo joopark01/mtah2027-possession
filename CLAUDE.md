@@ -15,7 +15,7 @@ Fork of the organisers' repo (`upstream` = metrica-sports/more-than-a-hack-2027,
 - `features/external/fetch_idsse.py`: downloads the 7 IDSSE matches (CC BY 4.0, Bassek et al. 2025) to `external_data/idsse/` as compact npz files with per-frame ball alive/dead and owner labels. The raw XML is deleted after conversion.
 - `features/external/idsse_features.py`: same extractor code on each IDSSE npz → `external_data/idsse_features/<id>.parquet`, plus `label` (DFL BallStatus/BallPossession → H/A/D) and `frame_id`. `frame` is a row index there, and the periods are adjacent, so split on `half`.
 - `features/tests/`: synthetic-match tests. Run them after any change to the extractor:
-  `python features/tests/make_synthetic_match.py /tmp/synth && MTAH_DATA_DIR=/tmp/synth python features/tests/test_synthetic.py && python features/tests/test_fetch_checks.py && python features/tests/test_idsse_features.py && python features/tests/test_degrade_ball.py && python features/tests/test_harness.py`
+  `python features/tests/make_synthetic_match.py /tmp/synth && MTAH_DATA_DIR=/tmp/synth python features/tests/test_synthetic.py && python features/tests/test_fetch_checks.py && python features/tests/test_idsse_features.py && python features/tests/test_degrade_ball.py && python features/tests/test_harness.py && python features/tests/test_dead_ball.py && python features/tests/test_tune_dead_ball.py`
 
 ## State (2026-11-15)
 - **Feature table built on real data; parsing verified.** Ball seen 59.3%, tracked 20.49, matching DATA.md.
@@ -23,7 +23,8 @@ Fork of the organisers' repo (`upstream` = metrica-sports/more-than-a-hack-2027,
 - **IDSSE feature tables built (7 matches).** The kickoff is the first alive row of each period; the signs match kloppy. Ball kinematics are masked at every block edge.
 - **Ball-loss simulation on IDSSE** (`features/external/degrade_ball.py`): a priori values (user's decision, 2026-11-15; not fitted to BAR-ATH). The 21 degraded tables in `external_data/idsse_degraded/` were rebuilt with them (onset/reacquisition lags drawn per dead span). The earlier BAR-ATH-fitted values are kept, unused, in `features/external/ball_loss_fitted_bar_ath.json` until the organisers confirm such fitting is allowed. Use them with `--ball-loss-params <file>`.
 - **Tuning harness** (`features/external/harness.py`): scores predictors on IDSSE with `pm.evaluate` and an X at the period seam. Held-out runs need `--holdout` and are logged to `external_data/harness/holdout_log.json`. `baseline_nearest` gets spell_f1_mean about 0.10 on tune data, degraded or clean (difference within noise). It predicts 4–4.6x too many spells. Degraded-table dead-ball edges are now randomised a priori per span (onset lag 0–4 s, reacquisition 0–1 s); a detector's ball vanish/reappear offsets stay `a_priori` and are never tuned. Residual risk: the spreads are themselves assumptions (`docs/findings.md`).
-- **Next:** dead-ball detector (design in `docs/dead-ball-detector-design.md`), tuned on IDSSE through the harness.
+- **Dead-ball detector v1** (`features/dead_ball.py`): rule-based per the design doc. Player-based timing/thresholds tuned on degraded IDSSE tuning tables (`features/external/tune_dead_ball.py`, log in `external_data/dead_ball_tune/`); ball vanish/reappear offsets a priori. In-sample: alive_dead_f1 0.95, spell_f1 0.12 (surface flat; team call is the limit). Transfer risk: IDSSE player tracking is clean (`docs/findings.md`).
+- **Next:** held-out evaluation of the detector, BAR-ATH plausibility, then the possession decoder with the contested state.
 
 ## Subagents (`.claude/agents/`)
 - **runner:** Bash only. Runs scripts on the provided match and reports aggregate output. Use it for every command that touches `data/`.

@@ -30,6 +30,18 @@
   "ball_loss_flickers_per_hour": 10,
   "ball_loss_flicker_frames_range": [1, 12],
 
+  "dead_out_margin_m": 0.61,
+  "dead_placed_still_frac_min": 0.5,
+  "dead_vanish_offset_frames": 0,
+  "dead_reappear_offset_frames": 0,
+  "dead_decel_lag_frames": 0,
+  "dead_onset_max_lookback_frames": 125,
+  "dead_smooth_half_window_frames": 0,
+  "dead_walking_frac_min": 0.7,
+  "dead_mean_speed_max_m_s": 2.0,
+  "dead_min_gap_frames": 50,
+  "dead_min_alive_frames": 25,
+
   "_provenance": {
     "fps": {
       "basis": "published",
@@ -179,6 +191,85 @@
       "basis": "a_priori",
       "source": "user/main-session decision 2026-11-15 (docs/findings.md, ball-loss section)",
       "reason": "Ball-loss simulation on IDSSE only (features/external/degrade_ball.py). Flicker length, uniform on these frame counts inclusive: [1, 12] (up to about half a second, the extractor's ball interpolation limit). A round guess. Chosen without fitting; but the authors had already seen BAR-ATH's label-free tracking aggregates (docs/findings.md) and the earlier BAR-ATH-fitted values (features/external/ball_loss_fitted_bar_ath.json), so the choice is not blind. Fixed 2026-11-15 before rebuilding the degraded tables and not revised after seeing them.",
+      "tuned_on": null
+    },
+    "dead_out_margin_m": {
+      "basis": "physics",
+      "source": "dead-ball detector v1 (features/dead_ball.py, docs/dead-ball-detector-design.md); main-session/user instruction 2026-11-15",
+      "reason": "Law 9: the ball is out when the whole ball has crossed the line, i.e. its centre is more than its radius (0.11 m, Law 2 circumference 68-70 cm) beyond the line. Plus 0.5 m allowed for ball tracking error (an assumption, stated a priori: a tactical-camera ball position is taken to be good to about half a metre), so a ball on the line is not called out by jitter.",
+      "tuned_on": null,
+      "revisit": "check the tracking-error part on IDSSE (design section 5); not graded by score"
+    },
+    "dead_placed_still_frac_min": {
+      "basis": "a_priori",
+      "source": "dead-ball detector v1 (features/dead_ball.py, docs/dead-ball-detector-design.md); main-session/user instruction 2026-11-15",
+      "reason": "Placed-ball candidate: ball_still_frac (share of still frames over the symmetric +/-ball_still_half_window_frames window) at least this, with the players stopped. A majority threshold on a symmetric window puts the candidate's edges at the frame where the ball starts or stops moving, so the restart (end) is not shifted by the window.",
+      "tuned_on": null
+    },
+    "dead_vanish_offset_frames": {
+      "basis": "a_priori",
+      "source": "dead-ball detector v1 (features/dead_ball.py, docs/dead-ball-detector-design.md); main-session/user instruction 2026-11-15",
+      "reason": "Start of a D gap when neither a line crossing nor a deceleration onset is available: the ball-vanish frame plus this offset. 0: the tracker loses the ball when play stops. Never tuned: on degraded IDSSE the vanish edge is set by the simulator's onset-lag assumption, so tuning it would fit that assumption (user decision 2026-11-15).",
+      "tuned_on": null
+    },
+    "dead_reappear_offset_frames": {
+      "basis": "a_priori",
+      "source": "dead-ball detector v1 (features/dead_ball.py, docs/dead-ball-detector-design.md); main-session/user instruction 2026-11-15",
+      "reason": "End of a D gap = the first frame the ball is seen again plus this offset (reacquisition lag 0: reappearance = the restart, findings 2026-11-09). Cannot be measured externally (design section 3). Never tuned: on degraded IDSSE the reappear edge is set by the simulator's reacquisition-lag assumption (user decision 2026-11-15).",
+      "tuned_on": null
+    },
+    "dead_decel_lag_frames": {
+      "basis": "tuned_external",
+      "source": "dead-ball detector v1 (features/dead_ball.py, docs/dead-ball-detector-design.md); main-session/user instruction 2026-11-15",
+      "reason": "A priori: Whistle -> deceleration lag. A D gap's start = onset of the stopped run (smoothed speed and walking past their thresholds) minus this lag. 1 s: about 0.2-0.3 s auditory reaction plus the time for the mean speed of 20 players to fall to walking pace. First-principles guess (a priori value 25). Tuned value 0 (2026-11-16: full joint grid over dead_ball.TUNABLE (15000 combos; this key over [0, 12, 25, 50, 75]), objective: maximise mean spell_f1_mean over the 15 degraded runs (5 tuning matches x seeds [0, 1, 2]), harness.run -> pm.evaluate; tie rule: among combos within 0.002 of the best mean spell_f1_mean, pick the highest mean alive_dead_f1; if still tied (equal to 1e-12), the one closest to the a priori values (sum over keys of |grid index - a priori grid index|), then the first in grid order. Chosen 0. On the edge of its grid (see docs/findings.md, dead-ball detector tuning)).",
+      "tuned_on": "IDSSE J03WMX, J03WN1, J03WOH, J03WOY, J03WQQ (degraded a priori ball-loss, seeds 0-2); held out J03WPY, J03WR9",
+      "target": "IDSSE DFL BallStatus/BallPossession proxy labels, spell_f1_mean via evaluation/possession_metrics.py. Never BAR-ATH GT or video.",
+      "tune_log": {"path": "external_data/dead_ball_tune/tune_log.json", "sha256": "8df0242aa07fa1f6acc4904ce26637e552d2abe88a94b003c7bd2dec74fd5e86", "timestamp": "2026-11-16T01:29:24"}
+    },
+    "dead_smooth_half_window_frames": {
+      "basis": "tuned_external",
+      "source": "dead-ball detector v1 (features/dead_ball.py, docs/dead-ball-detector-design.md); main-session/user instruction 2026-11-15",
+      "reason": "A priori: Change-point / smoothing window: walking share and mean speed are averaged over +/-12 frames (about 1 s, same as ball_still_half_window_frames) inside the half block, so single-frame tracking noise neither starts nor breaks a stopped run (a priori value 12). Tuned value 0 (2026-11-16: full joint grid over dead_ball.TUNABLE (15000 combos; this key over [0, 3, 6, 12, 18, 25]), objective: maximise mean spell_f1_mean over the 15 degraded runs (5 tuning matches x seeds [0, 1, 2]), harness.run -> pm.evaluate; tie rule: among combos within 0.002 of the best mean spell_f1_mean, pick the highest mean alive_dead_f1; if still tied (equal to 1e-12), the one closest to the a priori values (sum over keys of |grid index - a priori grid index|), then the first in grid order. Chosen 0. On the edge of its grid (see docs/findings.md, dead-ball detector tuning)).",
+      "tuned_on": "IDSSE J03WMX, J03WN1, J03WOH, J03WOY, J03WQQ (degraded a priori ball-loss, seeds 0-2); held out J03WPY, J03WR9",
+      "target": "IDSSE DFL BallStatus/BallPossession proxy labels, spell_f1_mean via evaluation/possession_metrics.py. Never BAR-ATH GT or video.",
+      "tune_log": {"path": "external_data/dead_ball_tune/tune_log.json", "sha256": "8df0242aa07fa1f6acc4904ce26637e552d2abe88a94b003c7bd2dec74fd5e86", "timestamp": "2026-11-16T01:29:24"}
+    },
+    "dead_walking_frac_min": {
+      "basis": "tuned_external",
+      "source": "dead-ball detector v1 (features/dead_ball.py, docs/dead-ball-detector-design.md); main-session/user instruction 2026-11-15",
+      "reason": "A priori: Players stopped: smoothed share of players walking (min of the two teams; all_walking_frac where a team's share is NaN) at least 0.8, i.e. all but about 4 of 22 walking (a keeper or a set-piece taker may still jog). A first-principles value; not blind: the BAR-ATH label-free gap aggregates (median 0.95 in long gaps vs 0.62 with the ball seen, docs/findings.md) had been seen (a priori value 0.8). Tuned value 0.7 (2026-11-16: full joint grid over dead_ball.TUNABLE (15000 combos; this key over [0.6, 0.7, 0.8, 0.9, 0.95]), objective: maximise mean spell_f1_mean over the 15 degraded runs (5 tuning matches x seeds [0, 1, 2]), harness.run -> pm.evaluate; tie rule: among combos within 0.002 of the best mean spell_f1_mean, pick the highest mean alive_dead_f1; if still tied (equal to 1e-12), the one closest to the a priori values (sum over keys of |grid index - a priori grid index|), then the first in grid order. Chosen 0.7).",
+      "tuned_on": "IDSSE J03WMX, J03WN1, J03WOH, J03WOY, J03WQQ (degraded a priori ball-loss, seeds 0-2); held out J03WPY, J03WR9",
+      "target": "IDSSE DFL BallStatus/BallPossession proxy labels, spell_f1_mean via evaluation/possession_metrics.py. Never BAR-ATH GT or video.",
+      "tune_log": {"path": "external_data/dead_ball_tune/tune_log.json", "sha256": "8df0242aa07fa1f6acc4904ce26637e552d2abe88a94b003c7bd2dec74fd5e86", "timestamp": "2026-11-16T01:29:24"}
+    },
+    "dead_mean_speed_max_m_s": {
+      "basis": "tuned_external",
+      "source": "dead-ball detector v1 (features/dead_ball.py, docs/dead-ball-detector-design.md); main-session/user instruction 2026-11-15",
+      "reason": "A priori: Players stopped: smoothed all_mean_speed at most 1.5 m/s, about ordinary human walking pace (~1.4 m/s, e.g. Bohannon 1997, Age Ageing) and below the 2.0 m/s walking/jogging zone boundary. Not blind: the BAR-ATH label-free aggregates (median 1.00 m/s in gaps vs 1.93 seen) had been seen (a priori value 1.5). Tuned value 2.0 (2026-11-16: full joint grid over dead_ball.TUNABLE (15000 combos; this key over [1.0, 1.25, 1.5, 2.0, 2.5]), objective: maximise mean spell_f1_mean over the 15 degraded runs (5 tuning matches x seeds [0, 1, 2]), harness.run -> pm.evaluate; tie rule: among combos within 0.002 of the best mean spell_f1_mean, pick the highest mean alive_dead_f1; if still tied (equal to 1e-12), the one closest to the a priori values (sum over keys of |grid index - a priori grid index|), then the first in grid order. Chosen 2.0).",
+      "tuned_on": "IDSSE J03WMX, J03WN1, J03WOH, J03WOY, J03WQQ (degraded a priori ball-loss, seeds 0-2); held out J03WPY, J03WR9",
+      "target": "IDSSE DFL BallStatus/BallPossession proxy labels, spell_f1_mean via evaluation/possession_metrics.py. Never BAR-ATH GT or video.",
+      "tune_log": {"path": "external_data/dead_ball_tune/tune_log.json", "sha256": "8df0242aa07fa1f6acc4904ce26637e552d2abe88a94b003c7bd2dec74fd5e86", "timestamp": "2026-11-16T01:29:24"}
+    },
+    "dead_min_gap_frames": {
+      "basis": "tuned_external",
+      "source": "dead-ball detector v1 (features/dead_ball.py, docs/dead-ball-detector-design.md); main-session/user instruction 2026-11-15",
+      "reason": "A ball-unknown run is a D candidate (a) only if at least 50 frames (2 s) long: a stoppage and restart (fetch, place, take) takes at least about 2 s, and 50 is well above the 12-frame interpolation limit so dropouts in play are not candidates. A priori value 50. Tuned 2026-11-16: full joint grid over dead_ball.TUNABLE (15000 combos; this key over [25, 50, 100, 150]), objective: maximise mean spell_f1_mean over the 15 degraded runs (5 tuning matches x seeds [0, 1, 2]), harness.run -> pm.evaluate; tie rule: among combos within 0.002 of the best mean spell_f1_mean, pick the highest mean alive_dead_f1; if still tied (equal to 1e-12), the one closest to the a priori values (sum over keys of |grid index - a priori grid index|), then the first in grid order. Chosen 50.",
+      "tuned_on": "IDSSE J03WMX, J03WN1, J03WOH, J03WOY, J03WQQ (degraded a priori ball-loss, seeds 0-2); held out J03WPY, J03WR9",
+      "target": "IDSSE DFL BallStatus/BallPossession proxy labels, spell_f1_mean via evaluation/possession_metrics.py. Never BAR-ATH GT or video.",
+      "tune_log": {"path": "external_data/dead_ball_tune/tune_log.json", "sha256": "8df0242aa07fa1f6acc4904ce26637e552d2abe88a94b003c7bd2dec74fd5e86", "timestamp": "2026-11-16T01:29:24"}
+    },
+    "dead_min_alive_frames": {
+      "basis": "tuned_external",
+      "source": "dead-ball detector v1 (features/dead_ball.py, docs/dead-ball-detector-design.md); main-session/user instruction 2026-11-15",
+      "reason": "Two D candidates separated by an alive run shorter than 25 frames (1 s), inside one half block, are merged: a restart followed by another stoppage within 1 s is implausible, and a spurious alive blip costs extra spells under spellF1. A priori value 25. Tuned 2026-11-16: full joint grid over dead_ball.TUNABLE (15000 combos; this key over [0, 12, 25, 50, 75]), objective: maximise mean spell_f1_mean over the 15 degraded runs (5 tuning matches x seeds [0, 1, 2]), harness.run -> pm.evaluate; tie rule: among combos within 0.002 of the best mean spell_f1_mean, pick the highest mean alive_dead_f1; if still tied (equal to 1e-12), the one closest to the a priori values (sum over keys of |grid index - a priori grid index|), then the first in grid order. Chosen 25.",
+      "tuned_on": "IDSSE J03WMX, J03WN1, J03WOH, J03WOY, J03WQQ (degraded a priori ball-loss, seeds 0-2); held out J03WPY, J03WR9",
+      "target": "IDSSE DFL BallStatus/BallPossession proxy labels, spell_f1_mean via evaluation/possession_metrics.py. Never BAR-ATH GT or video.",
+      "tune_log": {"path": "external_data/dead_ball_tune/tune_log.json", "sha256": "8df0242aa07fa1f6acc4904ce26637e552d2abe88a94b003c7bd2dec74fd5e86", "timestamp": "2026-11-16T01:29:24"}
+    },
+    "dead_onset_max_lookback_frames": {
+      "basis": "a_priori",
+      "source": "main-session decision 2026-11-15 (features/dead_ball.py)",
+      "reason": "Bounds the backward search for the deceleration onset: the stopped run containing the ball-vanish frame may reach back at most 125 frames (5 s). If it starts earlier, the D start is clipped to vanish - 125, with no lag applied. A referee whistles within seconds of play stopping, so a longer slow stretch with the ball still tracked is live play, not a stoppage. Not tuned.",
       "tuned_on": null
     }
   }

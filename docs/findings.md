@@ -161,3 +161,75 @@ Scoring is `evaluation/possession_metrics.py` (`pm.evaluate`). 26 X rows (one mo
 - **The degraded tables score better than the clean ones on frames.** On clean tables the ball is always known, so the baseline never predicts D. That gives macro_f1 0.36 and alive_dead_f1 0.70, and the gap is all false alive during dead spans. On degraded tables a missing ball mostly means a dead span, so "missing → D" gets alive/dead right much of the time (alive_dead_f1 0.86). That is a property of the simulator, which hides the ball mostly in dead spans, and it says nothing about competence. The ball-loss edges are now randomised a priori per dead span (onset 0–4 s, reacquisition 0–1 s), so they no longer sit at a fixed offset from the DFL edges. A detector's ball vanish/reappear offsets stay `a_priori` and are never tuned on degraded tables. Residual risk: the spreads are themselves assumptions, so degraded alive/dead scores remain only as realistic as those spreads.
 - **Degraded vs clean spell_f1 (0.106 vs 0.100) is within noise** (SPELL_NOISE_BAND 0.04).
 - **The team call is the second error.** Team accuracy is 0.76 on clean tables, where the baseline predicts alive almost everywhere. On degraded tables it drops to 0.62, because alive frames with a hidden ball are predicted D and the strict metric counts them as wrong.
+
+## 2026-11-15: dead-ball detector v1, untuned (`features/dead_ball.py`)
+
+First-principles values from `features/config.json` (`dead_*`), including the onset look-back bound `dead_onset_max_lookback_frames` = 125 (5 s, a priori). The main session added the bound before any tuning, because of a design concern (an unbounded backward search), not because of a score. Nothing was tuned, and no value was changed after these scores were seen. Tune split only; the held-out pair was not run. Scored with `harness.py --predictor dead_ball_v1` (alive frames: nearest team, carried forward over unknown-ball frames).
+
+**Tune split (J03WMX, J03WN1, J03WOH, J03WOY, J03WQQ), mean (min–max) over runs, vs `baseline_nearest` (above):**
+
+| predictor | tables | runs | spell_f1_mean | spell_f1@0.5 | macro_f1 | alive_dead_f1 | team_acc_gt_alive | n_pred_spells | fragmentation |
+|---|---|---|---|---|---|---|---|---|---|
+| baseline_nearest | degraded | 15 | 0.106 (0.08–0.13) | 0.092 (0.07–0.11) | 0.720 (0.69–0.75) | 0.861 (0.81–0.90) | 0.617 (0.55–0.67) | 1765 (1529–1994) | 3.45 (2.78–4.25) |
+| dead_ball_v1 | degraded | 15 | 0.120 (0.09–0.14) | 0.106 (0.08–0.13) | 0.756 (0.73–0.80) | 0.917 (0.90–0.95) | 0.730 (0.70–0.75) | 1704 (1471–1953) | 3.26 (2.60–4.11) |
+| baseline_nearest | clean | 5 | 0.100 (0.08–0.12) | 0.086 (0.07–0.10) | 0.359 (0.33–0.38) | 0.704 (0.65–0.74) | 0.764 (0.75–0.78) | 2092 (1981–2240) | 3.77 (3.32–4.43) |
+| dead_ball_v1 | clean | 5 | 0.115 (0.09–0.14) | 0.101 (0.08–0.12) | 0.776 (0.76–0.81) | 0.933 (0.92–0.96) | 0.757 (0.74–0.77) | 2124 (2014–2271) | 4.09 (3.55–4.84) |
+
+n_gt_spells is 454 (401–511) throughout.
+
+**D segments vs GT (DFL) D runs, per match, split at the period seam:** degraded 103.6 predicted vs 104.8 GT (95–109 vs 99–113 per run); clean 141.2 vs 104.8 (122–150). Predicted D share: degraded 32.6–47.2% vs GT 40.7–51.7%; clean 31.3–46.1%. One `detect` call takes about 0.013 s per match table.
+
+- **Alive/dead works on clean tables too** (alive_dead_f1 0.93, from 0.70), so the player cues carry it, not just "ball missing". On clean tables the ball is never missing, so every D there comes from the ball-out, placed-ball and stopped-player cues.
+- **spell_f1 barely moves** (0.106 → 0.120 degraded, 0.100 → 0.115 clean; the difference is inside SPELL_NOISE_BAND 0.04). Fragmentation is still 3–4x: the nearest-player team call during live play is the failure, which is the decoder's job.
+- **Under-calls D** (predicted share 4–9 pp below GT): consistent with a late start (the stopped onset minus 1 s) or short stoppages that never stop the players. The clean tables over-count D segments (141 vs 105), so some stoppages are split or have spurious short D in live play. Not investigated further. Tuning comes next, through the harness on the tune split.
+- **The look-back bound barely matters here.** Without it (the first v1 run): degraded spell_f1 0.120, alive_dead_f1 0.917, 103.3 D segments. On clean tables nothing changes, because there are no ball gaps.
+
+## 2026-11-16: dead-ball detector tuning (`features/external/tune_dead_ball.py`)
+
+Data: IDSSE (Bassek, Rein, Weber et al., Sci Data 12, 195 (2025), doi:10.1038/s41597-025-04505-y, CC BY 4.0). We tuned only the six player-based keys in `dead_ball.TUNABLE`. The ball vanish/reappear offsets, the out margin, the placed-ball threshold and the look-back bound kept their a priori values. The tuning data were the degraded (a priori ball-loss) tables of the 5 tuning matches × seeds 0–2, 15 runs per combo, loaded only through `harness.run(split="tune")`. The held-out pair was never loaded. The objective was the mean `spell_f1_mean` (harness → `pm.evaluate`). The tie rule was declared in the log before the first score: among combos within 0.002 of the best, take the highest mean `alive_dead_f1`; if still tied, take the combo closest to the a priori values in grid-index distance. The search was a full joint grid, not coordinate descent.
+
+**Run 1** (`external_data/dead_ball_tune/tune_log_run1.json`, 2026-11-15T23:58, 10,000 combos). Grid: lag {0, 12, 25, 50, 75}, smoothing {6, 12, 18, 25}, walking {0.6, 0.7, 0.8, 0.9, 0.95}, speed {1.0, 1.25, 1.5, 2.0, 2.5} m/s, min_gap {25, 50, 100, 150}, min_alive {0, 12, 25, 50, 75}. Chosen: lag 12, smoothing 6, walking 0.7, speed 2.0, min_gap 50, min_alive 0. Smoothing (6) and min_alive (0) were on grid edges.
+
+**Run 2, the edge extension** (`external_data/dead_ball_tune/tune_log.json`, 2026-11-16T01:29, 15,000 combos, sha256 8df0242a…). The smoothing grid was extended once, down to {0, 3}. min_alive could not be extended, because 0 (no merging) is its hard lower bound. Run 2 chose lag 0 (a lower edge, but a physical bound: a negative lag would start D after the deceleration), smoothing 0 (again an edge and a physical bound: no smoothing), walking 0.7, speed 2.0 m/s, min_gap 50 and min_alive 25. **Two keys are not interior: lag and smoothing, both at their physical minimum.** The single extension was used, so this is reported, not extended again. These are the values in `config.json`. `harness.dead_ball_v1` and `tune_dead_ball.py --check` refuse to run if the config differs from the log's chosen row.
+
+| key | a priori | chosen |
+|---|---|---|
+| dead_decel_lag_frames | 25 | 0 (edge) |
+| dead_smooth_half_window_frames | 12 | 0 (edge) |
+| dead_walking_frac_min | 0.8 | 0.7 |
+| dead_mean_speed_max_m_s | 1.5 | 2.0 |
+| dead_min_gap_frames | 50 | 50 |
+| dead_min_alive_frames | 25 | 25 |
+
+**Flatness: spell_f1 does not identify these keys.** Across all 15,000 combos, mean spell_f1 spans only 0.111–0.122, a quarter of SPELL_NOISE_BAND (0.04). The top 10 combos lie within 0.00015 (run 1: 0.00009), and 1,768 combos are within the 0.002 tie band. In practice the choice was made by `alive_dead_f1` inside that band. The spell_f1 optimum itself is lag 0, smoothing 3, walking 0.8, speed 2.0, min_gap 150, min_alive 75 (0.1225, alive_dead_f1 0.923). The alive_dead_f1-optimal combo is lag 0, smoothing 0, walking 0.6, speed 2.0, min_gap 50, min_alive 12 (alive_dead_f1 0.9505, spell_f1 0.1190). The chosen combo scores alive_dead_f1 0.9494 and spell_f1 0.1212. Only walking and speed move alive_dead_f1 by a lot (0.95 → 0.77 and 0.83 at the strict ends).
+
+**Tune split after tuning (J03WMX, J03WN1, J03WOH, J03WOY, J03WQQ), mean (min–max) over runs.** The held-out pair was not run.
+
+| predictor | tables | runs | spell_f1_mean | spell_f1@0.5 | macro_f1 | alive_dead_f1 | team_acc_gt_alive | n_pred_spells | fragmentation |
+|---|---|---|---|---|---|---|---|---|---|
+| baseline_nearest | degraded | 15 | 0.106 (0.08–0.13) | 0.092 (0.07–0.11) | 0.720 (0.69–0.75) | 0.861 (0.81–0.90) | 0.617 (0.55–0.67) | 1765 (1529–1994) | 3.45 (2.78–4.25) |
+| dead_ball_v1 untuned | degraded | 15 | 0.120 (0.09–0.14) | 0.106 (0.08–0.13) | 0.756 (0.73–0.80) | 0.917 (0.90–0.95) | 0.730 (0.70–0.75) | 1704 (1471–1953) | 3.26 (2.60–4.11) |
+| dead_ball_v1 tuned | degraded | 15 | 0.121 (0.09–0.14) | 0.107 (0.08–0.13) | 0.787 (0.77–0.81) | 0.949 (0.93–0.97) | 0.722 (0.69–0.75) | 1715 (1486–1974) | 3.31 (2.65–4.20) |
+| baseline_nearest | clean | 5 | 0.100 (0.08–0.12) | 0.086 (0.07–0.10) | 0.359 (0.33–0.38) | 0.704 (0.65–0.74) | 0.764 (0.75–0.78) | 2092 (1981–2240) | 3.77 (3.32–4.43) |
+| dead_ball_v1 untuned | clean | 5 | 0.115 (0.09–0.14) | 0.101 (0.08–0.12) | 0.776 (0.76–0.81) | 0.933 (0.92–0.96) | 0.757 (0.74–0.77) | 2124 (2014–2271) | 4.09 (3.55–4.84) |
+| dead_ball_v1 tuned | clean | 5 | 0.117 (0.09–0.14) | 0.103 (0.08–0.13) | 0.804 (0.78–0.83) | 0.961 (0.95–0.98) | 0.754 (0.74–0.77) | 2108 (1988–2264) | 4.06 (3.52–4.85) |
+
+These are in-sample numbers: the degraded tuned row is the tuning objective itself. Tuning raised alive_dead_f1 by 0.03 and left spell_f1 unchanged within noise (+0.001). Spell F1 is still limited by fragmentation in live play, which is the decoder's job.
+
+**Clean cross-check** (`external_data/dead_ball_tune/crosscheck.json`). Each key was varied over its grid with the others at the chosen values, on the clean tuning tables (5 runs), next to the degraded rows from the log. The chosen values were not changed in response. Each cell is spell_f1 / alive_dead_f1:
+
+| key | values | degraded | clean |
+|---|---|---|---|
+| lag | 0* 12 25 50 75 | .1212/.949, .1205/.949, .1193/.948, .1169/.943, .1147/.937 | .117/.961 for every value (clean tables have no ball gaps) |
+| smoothing | 0* 3 6 12 18 25 | .1212/.949, .1211/.949, .1214/.949, .1211/.948, .1212/.948, .1210/.947 | .1170/.961, .1172/.961, .1173/.960, .1172/.960, .1172/.959, .1171/.959 |
+| walking | 0.6 0.7* 0.8 0.9 0.95 | .119/.951, .121/.949, .122/.929, .119/.861, .116/.768 | .118/.973, .117/.961, .116/.944, .111/.895, .107/.841 |
+| speed | 1.0 1.25 1.5 2.0* 2.5 | .118/.826, .121/.894, .122/.937, .121/.949, .121/.949 | .110/.870, .113/.917, .116/.948, .117/.961, .117/.961 |
+| min_gap | 25 50* 100 150 | .121/.949, .121/.949, .121/.949, .121/.948 | .117/.961 for every value |
+| min_alive | 0 12 25* 50 75 | .120/.949, .121/.949, .121/.949, .121/.949, .121/.948 | .114/.959, .116/.960, .117/.961, .117/.963, .117/.963 |
+
+\* = chosen. **Flags** (rule: the clean optimum is more than one grid step from the degraded choice, or the clean score at the choice is more than 0.01 below the clean optimum):
+- **dead_smooth_half_window_frames**: the clean spell_f1 optimum is 6, against the choice of 0 (2 steps). The difference is 0.0003, far inside the noise band.
+- **dead_min_alive_frames**: the clean spell_f1 optimum is 75, against 25 (2 steps). The difference is 0.0002.
+- **dead_walking_frac_min**: clean alive_dead_f1 at the choice (0.7) is 0.961, which is 0.012 below the clean optimum of 0.973 at 0.6 (the grid edge). On clean tables, a looser walking threshold keeps helping alive/dead. On degraded tables the profile is flatter (0.951 vs 0.949). This is the one flag of practical size.
+
+**Transfer risk.** The degraded tables degrade only the ball; the player tracking is clean IDSSE. Smoothing 0, lag 0 and walking 0.7 were chosen exactly where clean IDSSE player tracking and the noisier BAR-ATH tactical tracking would differ most. The a priori reason for smoothing was single-frame tracking noise, which IDSSE does not have, so tuning could not see what removing it costs. The choice is also unstable inside the flat band: from run 1 to run 2, lag went 12 → 0 and min_alive 0 → 25, although only the smoothing grid was extended. The script hash differs between the two logs (`script_sha256` 1437872b… vs 3bae91fb…) because `tune_dead_ball.py` gained `--extend` and `--previous` between them. The run 2 log's header has two extra fields, `extended` and `previous_run`, and the harness and config hashes are identical in both logs. Treat these three values as weakly supported on BAR-ATH.

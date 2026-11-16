@@ -30,6 +30,7 @@
 - **Start = play stops.** Use the first available of:
   - the frame the ball is seen crossing a line;
   - the onset of collective deceleration (a change point in team speed), shifted by the whistle→deceleration lag measured on IDSSE;
+    *(v1: not a change point. The onset is the start of a threshold run: smoothed walking share and mean speed both past their thresholds, the run reaching back at most `dead_onset_max_lookback_frames` before the vanish frame. The lag is grid-tuned on IDSSE.)*
   - otherwise, the ball-vanish frame.
 
 ## 4. Who restarts
@@ -38,6 +39,8 @@ In priority order:
 2. **Goal tag:** the conceding team kicks off.
 3. **Geometry:** ball out over a goal line → goal kick (defenders) or corner (attackers), decided by the attack direction and the last-seen side. Ball out over a touchline → the team of the nearest player at reappearance.
 4. **Fallback:** the team of the nearest player when the ball reappears.
+
+**v1 status (2026-11-15):** item 3's goal-line rule (goal kick vs corner) is deferred to **v2**, because it needs a last-touch proxy. v1 uses items 1, 2 and 4. For a touchline restart, item 3 gives the same answer as item 4.
 
 ## 5. Parameters (go into `config.json` with provenance)
 | parameter | basis |

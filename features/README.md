@@ -43,8 +43,8 @@ Every value in `config.json` has an entry in its `_provenance` block with `basis
 |---|---|---|
 | `published` | stated in the challenge docs or a standard reference | fps, kickoff frames, walking speed, team map |
 | `law_of_game` | follows from the IFAB Laws of the Game | kickoff window and separation, still-ball speed, near-ball radii |
-| `physics` | follows from physics or human limits | turn-angle min speed, max plausible player speed |
-| `a_priori` | design choice made before seeing any labels | ball gap limit, velocity window, still-ball window, all `ball_loss_*` (IDSSE ball-loss simulation) |
+| `physics` | follows from physics or human limits | turn-angle min speed, max plausible player speed, `dead_out_margin_m` |
+| `a_priori` | design choice made before seeing any labels | ball gap limit, velocity window, still-ball window, all `ball_loss_*` (IDSSE ball-loss simulation), the other `dead_*` (dead-ball detector) |
 | `tuned_external` | tuned on an external dataset, named in `tuned_on` | none active (the unused fitted ball-loss variant is in `features/external/ball_loss_fitted_bar_ath.json`) |
 
 **Rules for changing a value:**
@@ -66,6 +66,16 @@ This step only adapts the data. It does no degradation and no tuning.
 
 `features/external/degrade_ball.py --all --seeds 0 1 2` simulates BAR-ATH-style ball loss on top of it and writes `external_data/idsse_degraded/<id>_s<seed>.parquet`. It uses the a priori `ball_loss_*` values from `config.json`. `--ball-loss-params features/external/ball_loss_fitted_bar_ath.json` swaps in the unused variant fitted to BAR-ATH label-free aggregates, which needs `tune_log.json`. See docs/findings.md.
 
+## Dead-ball detector (`dead_ball.py`)
+
+Rule-based v1 of `docs/dead-ball-detector-design.md`. `detect(df, cfg, ctx)` returns `dead` (bool per row), `segments` (half-open `[start, stop)`, never crossing a `half` block, so the adjacent IDSSE periods stay apart) and `restart_team` per segment (H, A or unknown). `predict_labels(df, cfg, ctx)` gives D on dead frames. Alive frames get the nearest player's team where the ball position is known; otherwise the last alive team is carried forward within the block, else the next one, else D. That is only there so the harness can score it; the possession decoder replaces it.
+
+- **ctx** is per game: `known_dead` (BAR-ATH `[(110808, 113742)]`, IDSSE `[]`) and `smart_tagging` (whether `st_` columns exist; asserted against the table). Pitch and attack signs are not needed yet: `ball_out_m` already carries the geometry.
+- **Candidates:** a ball-unknown run of at least `dead_min_gap_frames` where the players have stopped (gap median of the smoothed walking share and mean speed), the ball seen more than `dead_out_margin_m` outside the pitch, a placed ball (seen, `ball_still_frac` ≥ `dead_placed_still_frac_min`, players stopped), and `known_dead`. A long gap where the players keep running stays alive. A NaN team walking share falls back to `all_walking_frac`; a gap with no player data at all is unknown and is not called live.
+- **Boundaries:** a gap ends when the ball is seen again (+ `dead_reappear_offset_frames`, 0). It starts at the line crossing if the ball was last seen out; else at the onset of the stopped run minus `dead_decel_lag_frames`, where the run may reach back at most `dead_onset_max_lookback_frames` before the vanish frame (if it starts earlier, the start is clipped to that bound, with no lag); else at the vanish frame (+ `dead_vanish_offset_frames`, 0). D candidates separated by an alive run shorter than `dead_min_alive_frames` are merged.
+- **Restart team:** set-piece tag team (N/A falls through), else the goal tag (the conceding team), else the nearest player at the restart frame, else unknown. Goal-line geometry (goal kick vs corner) is deferred to v2. The tag meanings (the set-piece Team takes the restart; the goals Team scored) are assumptions.
+- **Tuning:** `dead_ball.TUNABLE` lists the keys the IDSSE grid may change. The offsets, `dead_out_margin_m`, `dead_onset_max_lookback_frames` and `dead_placed_still_frac_min` are fixed. Harness predictor: `harness.py --predictor dead_ball_v1`.
+
 ## Tests (no real data needed)
 
 ```bash
@@ -75,6 +85,8 @@ python features/tests/test_fetch_checks.py      # IDSSE fetch checks
 python features/tests/test_idsse_features.py    # IDSSE feature adapter
 python features/tests/test_degrade_ball.py      # IDSSE ball-loss simulation
 python features/tests/test_harness.py           # IDSSE tuning harness
+python features/tests/test_dead_ball.py         # dead-ball detector
+python features/tests/test_tune_dead_ball.py    # dead-ball detector tuning
 ```
 
 This builds a full-length fake match with scripted events and checks the extracted features against the known answers. The events cover:

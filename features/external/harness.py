@@ -42,11 +42,13 @@ ROOT = os.path.dirname(os.path.dirname(HERE))
 sys.path.insert(0, os.path.join(ROOT, "features"))
 sys.path.insert(0, os.path.join(ROOT, "evaluation"))
 import extract_features as ef  # noqa: E402
+import dead_ball  # noqa: E402
 import possession_metrics as pm  # noqa: E402
 
 EXT = os.path.join(ROOT, "external_data")
 CONFIG_PATH = os.path.join(ROOT, "features", "config.json")
 HOLDOUT_LOG = os.path.join(EXT, "harness", "holdout_log.json")
+DEAD_BALL_TUNE_LOG = os.path.join(EXT, "dead_ball_tune", "tune_log.json")
 LEAK_COLUMNS = ["label", "ball_dropped"]
 SEAM_ROWS = max(pm.TAUS) + 1
 SHOW = ["spell_f1_mean", "spell_f1_at_headline", "macro_f1", "alive_dead_f1",
@@ -70,12 +72,19 @@ def with_seam(codes, half):
     return np.insert(codes, seam, [pm.X] * SEAM_ROWS)
 
 
+def codes(labels):
+    """pm.label_codes on the distinct values only (it is elementwise), mapped back: same result,
+    without a Python loop over every frame."""
+    uniq, inv = np.unique(np.asarray(labels).astype(str), return_inverse=True)
+    return pm.label_codes(uniq)[inv]
+
+
 def score_match(df, pred_labels):
     """pm.evaluate on one match, GT = df['label'], with the period seam X inserted in both."""
     assert len(pred_labels) == len(df), "pred {} rows vs table {}".format(len(pred_labels), len(df))
-    gt = pm.label_codes(np.asarray(df["label"]).astype(str))
+    gt = codes(np.asarray(df["label"]).astype(str))
     assert (gt != pm.X).all(), "IDSSE GT should have no X before the seam"
-    pred = pm.label_codes(np.asarray(pred_labels))
+    pred = codes(np.asarray(pred_labels))
     return pm.evaluate(with_seam(gt, df["half"]), with_seam(pred, df["half"]))
 
 
@@ -86,7 +95,28 @@ def baseline_nearest(df):
     return np.where(known & (nt == 0), "H", np.where(known & (nt == 1), "A", "D"))
 
 
-PREDICTORS = {"baseline_nearest": baseline_nearest}
+# IDSSE context for the dead-ball detector: no published dead spans (periods start at kickoff),
+# no Smart Tagging.
+IDSSE_CTX = {"known_dead": [], "smart_tagging": False}
+
+
+def load_config():
+    with open(CONFIG_PATH) as f:
+        cfg = json.load(f)
+    ef.check_provenance(cfg)
+    return cfg
+
+
+def dead_ball_v1(df):
+    """features/dead_ball.py v1 with the values in config.json, which must equal the dead-ball
+    tune log's chosen row (tune_dead_ball.frozen_from_log)."""
+    import tune_dead_ball
+    cfg = load_config()
+    tune_dead_ball.frozen_from_log(DEAD_BALL_TUNE_LOG, cfg)
+    return dead_ball.predict_labels(df, cfg, IDSSE_CTX)
+
+
+PREDICTORS = {"baseline_nearest": baseline_nearest, "dead_ball_v1": dead_ball_v1}
 
 
 def split_ids(split, allow_holdout, ids=None):
