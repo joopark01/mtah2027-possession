@@ -3,6 +3,8 @@
     python features/external/tune_dead_ball.py --tune --log external_data/dead_ball_tune/tune_log.json --workers 7
     python features/external/tune_dead_ball.py --crosscheck --log ... --out ... --workers 7
     python features/external/tune_dead_ball.py --check --log ...      # config == log's chosen row
+    python features/external/tune_dead_ball.py --tune-one dead_min_dead_frames \
+        --log external_data/dead_ball_tune/tune_log_min_dead.json --workers 5
 
 Data: Bassek, Rein, Weber et al., Sci Data 12, 195 (2025), doi:10.1038/s41597-025-04505-y,
 CC BY 4.0. EXTERNAL data only; BAR-ATH never goes through this script.
@@ -43,7 +45,14 @@ TIE_RULE = ("among combos within {} of the best mean spell_f1_mean, pick the hig
             "(sum over keys of |grid index - a priori grid index|), then the first in grid order"
             ).format(SPELL_TIE_BAND)
 METRICS = ("spell_f1_mean", "alive_dead_f1", "macro_f1")
-assert tuple(GRID) == hz.dead_ball.TUNABLE, "GRID keys must be exactly dead_ball.TUNABLE"
+# One-key searches (--tune-one), run after the joint grid with every other dead_* key held at its
+# config value. Grid and tie rule declared 2026-11-16 (user decision) before the first score.
+ONE_KEY_GRID = {"dead_min_dead_frames": [0, 12, 25, 38, 50]}
+ONE_KEY_TIE_BAND = 0.001
+ONE_KEY_TIE_RULE = ("highest mean spell_f1_mean; if the top values are within {} of each other, "
+                    "take the smallest value (frame count) among them").format(ONE_KEY_TIE_BAND)
+assert tuple(GRID) + tuple(ONE_KEY_GRID) == hz.dead_ball.TUNABLE, \
+    "GRID + ONE_KEY_GRID keys must be exactly dead_ball.TUNABLE"
 
 _TABLES = {}   # per worker process: (match, tables, seed) -> DataFrame
 
@@ -64,7 +73,11 @@ def evaluate(cfg, combo, tables, seeds, loader):
     pred = lambda d: hz.dead_ball.predict_labels(d, c, hz.IDSSE_CTX)
     pred.__name__ = "dead_ball_v1"
     _, summary = hz.run(pred, "tune", tables, seeds, loader=loader)
-    return dict(combo, **{k: float(summary[k]["mean"]) for k in METRICS})
+    return dict(combo, **{k: float(summary[k]["mean"]) for k in METRICS},
+                spell_f1_min=float(summary["spell_f1_mean"]["min"]),
+                spell_f1_max=float(summary["spell_f1_mean"]["max"]),
+                n_pred_spells=float(summary["n_pred_spells"]["mean"]),
+                n_gt_spells=float(summary["n_gt_spells"]["mean"]))
 
 
 def _work(args):
@@ -133,6 +146,53 @@ def tune(log_path, workers, extend, previous):
         json.dump(log, f, indent=1)
     print(json.dumps({k: log[k] for k in ("chosen", "chosen_scores", "chosen_interior",
                                           "alive_dead_optimal", "top10_spell_f1_spread")}, indent=1))
+
+
+def choose_one(results, key):
+    """ONE_KEY_TIE_RULE."""
+    best = max(r["spell_f1_mean"] for r in results)
+    return min((r for r in results if r["spell_f1_mean"] >= best - ONE_KEY_TIE_BAND),
+               key=lambda r: r[key])
+
+
+def tune_one(key, log_path, workers):
+    """Grid one key (ONE_KEY_GRID) on degraded tuning tables; clean tables scored as a cross-check
+    only (never used for selection). Log format compatible with frozen_from_log."""
+    if os.path.exists(log_path):
+        raise SystemExit("{} exists: refusing to overwrite a tune log".format(log_path))
+    assert key in ONE_KEY_GRID, "--tune-one: {} not in ONE_KEY_GRID".format(key)
+    cfg = hz.load_config()
+    grid = {key: ONE_KEY_GRID[key]}
+    combos = combos_of(grid)
+    head = {"timestamp": datetime.datetime.now().isoformat(timespec="seconds"), "grid": grid,
+            "fixed": {k: cfg[k] for k in cfg if k.startswith("dead_") and k != key},
+            "seeds": list(SEEDS), "tables": "degraded (ball_loss_variant a_priori)",
+            "tune_ids": list(hz.split_ids("tune", False)),
+            "held_out_ids_not_used": list(hz.ef.IDSSE_HOLDOUT),
+            "objective": OBJECTIVE, "tie_rule": ONE_KEY_TIE_RULE,
+            "script_sha256": hz.sha256(os.path.abspath(__file__)),
+            "harness_sha256": hz.sha256(hz.__file__),
+            "detector_sha256": hz.sha256(hz.dead_ball.__file__),
+            "config_sha256": hz.sha256(hz.CONFIG_PATH), "source": hz.SOURCE}
+    os.makedirs(os.path.dirname(log_path), exist_ok=True)
+    with open(log_path, "x") as f:           # objective and tie rule on disk before any score
+        json.dump(dict(head, status="running", n_combos=len(combos)), f, indent=1)
+    results = run_parallel(cfg, combos, "degraded", SEEDS, workers)
+    chosen = choose_one(results, key)
+    clean = run_parallel(cfg, combos, "clean", (), workers)
+    log = dict(head, status="done", n_combos=len(combos), chosen={key: chosen[key]},
+               chosen_scores={m: chosen[m] for m in METRICS + ("n_pred_spells",)}, results=results,
+               clean_crosscheck_not_used_for_selection=clean)
+    with open(log_path, "w") as f:
+        json.dump(log, f, indent=1)
+    for name, rows in (("degraded", results), ("clean", clean)):
+        print(name)
+        for r in rows:
+            print("  {:>4}  sf1 {:.4f} [{:.4f}-{:.4f}]  ad {:.4f}  spells {:.1f}{}".format(
+                r[key], r["spell_f1_mean"], r["spell_f1_min"], r["spell_f1_max"],
+                r["alive_dead_f1"], r["n_pred_spells"],
+                "  <- chosen" if name == "degraded" and r[key] == chosen[key] else ""))
+    print("data: " + hz.SOURCE)
 
 
 def frozen_from_log(log_path, cfg):
@@ -207,6 +267,7 @@ def main():
     g.add_argument("--tune", action="store_true")
     g.add_argument("--crosscheck", action="store_true")
     g.add_argument("--check", action="store_true")
+    g.add_argument("--tune-one", metavar="KEY", help="one-key search over ONE_KEY_GRID[KEY]")
     p.add_argument("--log", required=True)
     p.add_argument("--out", help="--crosscheck output json")
     p.add_argument("--workers", type=int)
@@ -219,7 +280,9 @@ def main():
         return
     if not a.workers:
         p.error("--workers required")
-    if a.tune:
+    if a.tune_one:
+        tune_one(a.tune_one, a.log, a.workers)
+    elif a.tune:
         ext = {}
         for e in a.extend:
             k, vs = e.split("=")

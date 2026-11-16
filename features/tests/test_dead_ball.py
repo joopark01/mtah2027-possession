@@ -21,7 +21,8 @@ with open(os.path.join(HERE, "..", "config.json")) as f:
 CFG.update(dead_out_margin_m=0.61, dead_placed_still_frac_min=0.5, dead_vanish_offset_frames=0,
            dead_reappear_offset_frames=0, dead_decel_lag_frames=5, dead_onset_max_lookback_frames=125,
            dead_smooth_half_window_frames=2, dead_walking_frac_min=0.8,
-           dead_mean_speed_max_m_s=1.5, dead_min_gap_frames=20, dead_min_alive_frames=10)
+           dead_mean_speed_max_m_s=1.5, dead_min_gap_frames=20, dead_min_alive_frames=10,
+           dead_min_dead_frames=0)
 CTX = {"known_dead": [], "smart_tagging": False}
 RUN, STOP = (0.5, 3.0), (0.95, 0.8)  # (walking share, mean speed)
 
@@ -135,6 +136,23 @@ def main():
     df = table(600)
     df.loc[100:149, "ball_out_m"] = 0.5
     assert segs(df)["segments"] == []
+
+    # 3b. dead_min_dead_frames: after merging, D segments shorter than it become alive. Two
+    # out-of-play candidates 10 and 30 frames long; the blip-merged pair (100, 200) is 100 long.
+    df = table(600)
+    df.loc[300:309, "ball_out_m"] = 2.0
+    df.loc[400:429, "ball_out_m"] = 2.0
+    assert segs(df)["segments"] == [(300, 310), (400, 430)]           # 0 = off
+    md = dict(CFG, dead_min_dead_frames=30)
+    assert segs(df, md)["segments"] == [(400, 430)]                    # 10 < 30 dropped, 30 kept
+    assert not segs(df, md)["dead"][300:310].any()
+    assert segs(df, dict(CFG, dead_min_dead_frames=31))["segments"] == []
+    df.loc[100:149, "ball_out_m"] = 2.0
+    df.loc[155:199, "ball_out_m"] = 2.0                               # merged first, then length 100
+    assert segs(df, dict(CFG, dead_min_dead_frames=60))["segments"] == [(100, 200)]
+    kctx = {"known_dead": [(302, 305)], "smart_tagging": False}       # known_dead never dropped,
+    assert segs(df, md, kctx)["segments"] == [(100, 200), (300, 310), (400, 430)]  # nor its segment
+    raises(AssertionError, db.detect, df, dict(CFG, dead_min_dead_frames=-1), CTX)
 
     # 4. Adjacent periods (IDSSE): a stoppage across the seam at 300 splits there; the onset lag is
     # clipped at the block start; no merge across the seam.

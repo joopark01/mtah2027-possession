@@ -50,14 +50,15 @@ In priority order:
 | whistle→deceleration lag, change-point window | tuned on IDSSE |
 | still-ball speed | already in config (Laws 13–17) |
 | reacquisition lag | a_priori = 0 (cannot be measured externally) |
+| `min_dead_frames` | tuned on IDSSE (degraded), 2026-11-16: 0 (off), all grid values tied |
 
 ## 6. Validation
 - **IDSSE, held-out matches:** D-segment precision and recall at IoU ≥ 0.5, the distribution of start/end errors in frames, and restart-team accuracy. This needs the IDSSE per-frame ball status, which kloppy confirms exists (BallStatus / BallPossession).
 - **BAR-ATH plausibility, no labels:**
   - D share of graded frames;
-  - stoppage count per half (a typical match has roughly 100–120 restarts);
+  - stoppage count per half (the 5 IDSSE tuning matches have a mean of 104.8 D segments per match, range 99–113, from the DFL BallStatus labels split per half);
   - restart-type mix vs Smart Tagging;
-  - no D segment shorter than ~1 s.
+  - no D segment shorter than ~1 s (expectation only; v1 still predicts some, and `dead_min_dead_frames` tuned to 0, see `docs/findings.md`).
 
 ## 7. Build order
 1. Download IDSSE (`features/external/fetch_idsse.py` → `external_data/idsse/`).

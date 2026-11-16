@@ -68,6 +68,7 @@ def main():
            loader=loader)
     raises(PermissionError, hz.run, oracle, "holdout", "clean", (), loader=loader)
     raises(ValueError, hz.split_ids, "holdout", True, [hz.ef.IDSSE_TUNE[0]])
+    raises(PermissionError, hz.load_table, hz.ef.IDSSE_HOLDOUT[0], "clean", None)
     print("test_harness: all checks passed")
 
 

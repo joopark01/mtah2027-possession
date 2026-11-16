@@ -255,7 +255,9 @@ These are in-sample numbers: the degraded tuned row is the tuning objective itse
 | holdout | degraded | 126.5 | 94.5 | 16.8% | 42.6% | 43.1% |
 | holdout | clean | 147.5 | 94.5 | 18.8% | 40.6% | 43.1% |
 
-**Proposed v2: a minimum D length of 1 s, chosen a priori** (design doc section 6: no stoppage is shorter than about 1 s). The support comes from the tuning matches alone: 14–37% more predicted D segments than true ones, and 10.1–13.2% of predicted segments under 1 s, while the true labels have almost none. A spurious short D segment splits a possession spell. Removing it can instead merge two spells; that effect is unmeasured. Awaiting a decision.
+**Proposed v2: a minimum D length of 1 s, chosen a priori** (design doc section 6: no stoppage is shorter than about 1 s). The support comes from the tuning matches alone: 14–37% more predicted D segments than true ones, and 10.1–13.2% of predicted segments under 1 s, while the true labels have almost none. A spurious short D segment splits a possession spell. Removing it can instead merge two spells; that effect is unmeasured.
+
+**Decision (user, 2026-11-16):** `dead_min_dead_frames` tuned on the tuning matches by spell_f1 over {0, 12, 25, 38, 50} frames (`tune_dead_ball.py --tune-one`, log `external_data/dead_ball_tune/tune_log_min_dead.json`). All five lay within the 0.001 tie band (25: 0.1222, 0: 0.1212), so the tie rule took **0 (off)**: removing short D segments removes about 16 of ~1,700 predicted spells per match and does not fix over-segmentation, which comes from the live-play team call. The `100-120 restarts` reference is replaced by the true IDSSE tuning-match mean, 104.8 D segments per match (range 99-113).
 
 **BAR-ATH plausibility** (`features/dead_ball_report.py`; label-free aggregates, no ground truth, no video):
 
@@ -273,6 +275,6 @@ graded frames 158857, predicted D share 43.1%
 ```
 
 - **D share:** compare predicted with predicted. Without the pre-kickoff span (IDSSE periods start at kickoff), BAR-ATH is 42.0%, inside the IDSSE predicted split means (40.6–44.5%).
-- **Segments:** 144 is above the 100–120 restarts expected, as on IDSSE. Dropping the 13 under 1 s would leave about 131, still above the range.
+- **Segments:** 144 is above the IDSSE true mean of 104.8 per tuning match (range 99–113), as on IDSSE. Dropping the 13 under 1 s would leave about 131, still above the range.
 - **Set-piece overlap:** 78 / 145 is an upper bound on tag-based restart calls, because the window runs 1 s past the restart. Smart Tagging coverage of throw-ins and goal kicks is unknown, so this is weak evidence either way.
 - **Ball-missing frames:** 11.9% are called alive. No independent estimate of the live share of missing frames exists to compare it with.

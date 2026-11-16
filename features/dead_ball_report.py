@@ -25,6 +25,16 @@ import extract_features as ef  # noqa: E402
 SHORT_FRAMES = 25  # 1 s: design doc 6 expects no D segment shorter than ~1 s
 
 
+def bar_ath_ctx(df, cfg):
+    """dead_ball ctx for BAR-ATH: published: the 2nd half is graded from its first row, the kickoff
+    is later (DATA.md, FAQ.md), so that span is known dead. Smart Tagging present."""
+    half = df["half"].to_numpy()
+    first2, ko2 = int(np.flatnonzero(half == 2)[0]), int(cfg["kickoff_video_frames"]["2"])
+    if not first2 < ko2:
+        raise ValueError("2nd half starts at row {}, not before its kickoff {}".format(first2, ko2))
+    return {"known_dead": [(first2, ko2)], "smart_tagging": True}
+
+
 def main():
     path = os.path.join(os.environ.get("MTAH_DATA_DIR") or os.path.join(ROOT, "data"),
                         "derived", "features_tactical.parquet")
@@ -33,11 +43,8 @@ def main():
     ef.check_provenance(cfg)
     df = pd.read_parquet(path)
     half = df["half"].to_numpy()
-    # published: the 2nd half is graded from its first row, the kickoff is later (DATA.md, FAQ.md)
-    first2, ko2 = int(np.flatnonzero(half == 2)[0]), int(cfg["kickoff_video_frames"]["2"])
-    if not first2 < ko2:
-        raise ValueError("2nd half starts at row {}, not before its kickoff {}".format(first2, ko2))
-    ctx = {"known_dead": [(first2, ko2)], "smart_tagging": True}
+    ctx = bar_ath_ctx(df, cfg)
+    (first2, ko2), = ctx["known_dead"]
     out = db.detect(df, cfg, ctx)
     graded = df["graded"].to_numpy()
     dead = out["dead"]
@@ -52,7 +59,7 @@ def main():
     for h in (1, 2):
         n = sum(half[s] == h for s, _, _ in segs)
         print("  half {}: {} D segments".format(h, n))
-    print("  total {} D segments (design doc: a match has roughly 100-120 restarts)".format(len(segs)))
+    print("  total {} D segments (IDSSE tuning matches, DFL labels: mean 104.8 D segments per match, range 99-113)".format(len(segs)))
     print("  length s: shortest {:.2f}, quartiles {:.1f} / {:.1f} / {:.1f}, longest {:.1f}".format(
         lens.min() / 25, *(np.percentile(lens, [25, 50, 75]) / 25), lens.max() / 25))
     print("  shorter than {:.0f} s: {} ({:.1%})".format(SHORT_FRAMES / 25, (lens < SHORT_FRAMES).sum(),

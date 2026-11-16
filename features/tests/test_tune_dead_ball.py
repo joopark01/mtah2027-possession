@@ -36,6 +36,14 @@ def table(n_half):
                          "ball_dropped": ~live})
 
 
+def raises_exit(fn, *args):
+    try:
+        fn(*args)
+    except SystemExit:
+        return
+    raise AssertionError("{} did not exit".format(fn.__name__))
+
+
 def main():
     # codes(): same as pm.label_codes, element for element
     lab = np.array(["H", "D", "A", "X", "H"])
@@ -93,8 +101,30 @@ def main():
                 raise AssertionError("freeze check passed a changed config")
             except SystemExit:
                 pass
+            # one-key mode: log loads only tuning ids, holds every other dead_* key fixed, and
+            # passes the freeze check
+            asked.clear()
+            one = os.path.join(tmp, "tune_log_one.json")
+            td.tune_one("dead_min_dead_frames", one, 1)
+            o = json.load(open(one))
+            assert set(asked) == set(hz.ef.IDSSE_TUNE), "held-out table loaded"
+            assert [r["dead_min_dead_frames"] for r in o["results"]] == td.ONE_KEY_GRID["dead_min_dead_frames"]
+            assert len(o["clean_crosscheck_not_used_for_selection"]) == len(o["results"])
+            assert "dead_min_dead_frames" not in o["fixed"] and "dead_min_gap_frames" in o["fixed"]
+            cfg1 = dict(hz.load_config(), **o["chosen"])
+            cfg1["_provenance"] = dict(cfg1["_provenance"], dead_min_dead_frames={"tune_log": {"sha256": hz.sha256(one)}})
+            assert td.frozen_from_log(one, cfg1)["timestamp"] == o["timestamp"]
+            raises_exit(td.tune_one, "dead_min_dead_frames", one, 1)   # no overwrite
+            raises_exit(td.frozen_from_log, one, dict(cfg1, dead_min_gap_frames=cfg1["dead_min_gap_frames"] + 1))
     finally:
         hz.load_table = real_loader
+
+    # one-key tie rule: within 0.001 of the best -> smallest value; outside the band ignored
+    k = "dead_min_dead_frames"
+    rs = [{k: 0, "spell_f1_mean": 0.1200}, {k: 12, "spell_f1_mean": 0.1205},
+          {k: 25, "spell_f1_mean": 0.1212}, {k: 38, "spell_f1_mean": 0.1213}]
+    assert td.choose_one(rs, k)[k] == 12, td.choose_one(rs, k)
+    assert td.choose_one(rs[:1] + rs[2:3], k)[k] == 25
 
     # tie rule: within the band, highest alive_dead_f1, then closest to the a priori values
     grid = {"a": [0, 1, 2], "b": [0, 1, 2]}

@@ -49,6 +49,7 @@ EXT = os.path.join(ROOT, "external_data")
 CONFIG_PATH = os.path.join(ROOT, "features", "config.json")
 HOLDOUT_LOG = os.path.join(EXT, "harness", "holdout_log.json")
 DEAD_BALL_TUNE_LOG = os.path.join(EXT, "dead_ball_tune", "tune_log.json")
+DEAD_BALL_MIN_DEAD_LOG = os.path.join(EXT, "dead_ball_tune", "tune_log_min_dead.json")
 LEAK_COLUMNS = ["label", "ball_dropped"]
 SEAM_ROWS = max(pm.TAUS) + 1
 SHOW = ["spell_f1_mean", "spell_f1_at_headline", "macro_f1", "alive_dead_f1",
@@ -107,16 +108,32 @@ def load_config():
     return cfg
 
 
-def dead_ball_v1(df):
-    """features/dead_ball.py v1 with the values in config.json, which must equal the dead-ball
-    tune log's chosen row (tune_dead_ball.frozen_from_log)."""
+def frozen_config():
+    """load_config(), checked against both dead-ball tune logs (tune_dead_ball.frozen_from_log).
+    Every path that runs the tuned detector loads its config through here."""
     import tune_dead_ball
     cfg = load_config()
     tune_dead_ball.frozen_from_log(DEAD_BALL_TUNE_LOG, cfg)
+    tune_dead_ball.frozen_from_log(DEAD_BALL_MIN_DEAD_LOG, cfg)
+    return cfg
+
+
+def dead_ball_v1(df):
+    """features/dead_ball.py v1 with the values in config.json (frozen_config)."""
+    cfg = frozen_config()
     return dead_ball.predict_labels(df, cfg, IDSSE_CTX)
 
 
-PREDICTORS = {"baseline_nearest": baseline_nearest, "dead_ball_v1": dead_ball_v1}
+def decoder_v1(df):
+    """features/possession_decoder.py v1 with the values in config.json (frozen_config). The
+    decoder_* values are a priori until tune_decoder.py has been run."""
+    import possession_decoder
+    cfg = frozen_config()
+    return possession_decoder.decode(df, cfg, IDSSE_CTX)
+
+
+PREDICTORS = {"baseline_nearest": baseline_nearest, "dead_ball_v1": dead_ball_v1,
+              "decoder_v1": decoder_v1}
 
 
 def split_ids(split, allow_holdout, ids=None):
@@ -134,7 +151,9 @@ def split_ids(split, allow_holdout, ids=None):
     return ids
 
 
-def load_table(mid, tables, seed):
+def load_table(mid, tables, seed, allow_holdout=False):
+    if mid in ef.IDSSE_HOLDOUT and not allow_holdout:
+        raise PermissionError("{} is held out; only run(..., allow_holdout=True) may load it".format(mid))
     if tables == "clean":
         return pd.read_parquet(os.path.join(EXT, "idsse_features", mid + ".parquet"))
     assert tables == "degraded", "tables must be degraded or clean, got {!r}".format(tables)
@@ -155,7 +174,8 @@ def run(predictor, split, tables, seeds, allow_holdout=False, ids=None, loader=l
     rows = []
     for mid in ids:
         for seed in (seeds if tables == "degraded" else (None,)):
-            df = loader(mid, tables, seed)
+            df = (loader(mid, tables, seed, allow_holdout=True) if loader is load_table
+                  and split == "holdout" else loader(mid, tables, seed))
             pred = np.asarray(predictor(df.drop(columns=[c for c in LEAK_COLUMNS if c in df])))
             res = score_match(df, pred)
             rows.append(dict(match=mid, seed=seed, **{k: res[k] for k in SHOW}))

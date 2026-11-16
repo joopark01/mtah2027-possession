@@ -19,7 +19,8 @@ no smoothing, run, merge or segment crosses a block edge. Intervals are half-ope
 Candidates (design section 2): (a) long ball gaps where the players have stopped, (b) the ball
 seen out of play, (c) a placed ball (seen, still, players stopped), (d) ctx known_dead. A long gap
 where the players keep running is not D (2.2). D candidates separated by an alive blip shorter than
-dead_min_alive_frames are merged (2.3).
+dead_min_alive_frames are merged (2.3). After merging, every D segment shorter than
+dead_min_dead_frames becomes alive (0 = off); a segment holding any ctx known_dead frame is kept.
 
 Boundaries (section 3), for a D gap [v, e) of the unknown ball: end = e + reappear offset (the
 first frame the ball is seen again; reappearances are treated as moving, findings: only 2% are
@@ -53,7 +54,8 @@ import extract_features as ef
 # Keys the IDSSE tuning step may grid. Everything else is fixed a priori (the vanish/reappear
 # offsets are never tuned: on degraded IDSSE they are set by the simulator's assumptions).
 TUNABLE = ("dead_decel_lag_frames", "dead_smooth_half_window_frames", "dead_walking_frac_min",
-           "dead_mean_speed_max_m_s", "dead_min_gap_frames", "dead_min_alive_frames")
+           "dead_mean_speed_max_m_s", "dead_min_gap_frames", "dead_min_alive_frames",
+           "dead_min_dead_frames")
 CTX_KEYS = {"known_dead", "smart_tagging"}
 TEAM = np.array(["H", "A"])
 
@@ -106,6 +108,7 @@ def detect(df, cfg, ctx):
     bstop = np.array([b for _, b in blocks])[bid]
     h = cfg["dead_smooth_half_window_frames"]
     assert h >= 0 and cfg["dead_min_gap_frames"] >= 1 and cfg["dead_min_alive_frames"] >= 0
+    assert cfg["dead_min_dead_frames"] >= 0, "dead_min_dead_frames negative"
 
     # player state, smoothed; NaN = unknown (findings 2026-11-15: NaN team walking share falls
     # back to all_walking_frac, never read as "not walking")
@@ -149,13 +152,19 @@ def detect(df, cfg, ctx):
         stop = min(e + cfg["dead_reappear_offset_frames"], bstop[v])
         dead[max(start, a):stop] = True
 
+    kd = np.zeros(n, bool)
     for a, b in ctx["known_dead"]:                              # (d)
         assert 0 <= a < b <= n and bid[a] == bid[b - 1], "known_dead {} not inside one block".format((a, b))
-        dead[a:b] = True
+        kd[a:b] = True
+    dead |= kd
 
     for a, b in _runs(~dead, blocks):                           # merge short alive blips
         if b - a < cfg["dead_min_alive_frames"] and a > blocks[bid[a]][0] and b < bstop[a]:
             dead[a:b] = True
+
+    for a, b in _runs(dead, blocks):                            # drop short D segments
+        if b - a < cfg["dead_min_dead_frames"] and not kd[a:b].any():
+            dead[a:b] = False
 
     segments = _runs(dead, blocks)
     return {"dead": dead, "segments": segments,
