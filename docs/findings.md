@@ -233,3 +233,46 @@ These are in-sample numbers: the degraded tuned row is the tuning objective itse
 - **dead_walking_frac_min**: clean alive_dead_f1 at the choice (0.7) is 0.961, which is 0.012 below the clean optimum of 0.973 at 0.6 (the grid edge). On clean tables, a looser walking threshold keeps helping alive/dead. On degraded tables the profile is flatter (0.951 vs 0.949). This is the one flag of practical size.
 
 **Transfer risk.** The degraded tables degrade only the ball; the player tracking is clean IDSSE. Smoothing 0, lag 0 and walking 0.7 were chosen exactly where clean IDSSE player tracking and the noisier BAR-ATH tactical tracking would differ most. The a priori reason for smoothing was single-frame tracking noise, which IDSSE does not have, so tuning could not see what removing it costs. The choice is also unstable inside the flat band: from run 1 to run 2, lag went 12 → 0 and min_alive 0 → 25, although only the smoothing grid was extended. The script hash differs between the two logs (`script_sha256` 1437872b… vs 3bae91fb…) because `tune_dead_ball.py` gained `--extend` and `--previous` between them. The run 2 log's header has two extra fields, `extended` and `previous_run`, and the harness and config hashes are identical in both logs. Treat these three values as weakly supported on BAR-ATH.
+
+## 2026-11-16: dead-ball detector held-out evaluation and BAR-ATH plausibility
+
+**Held-out pair (J03WPY, J03WR9): first look**, `harness.py --predictor dead_ball_v1 --holdout` with the frozen tuned values. Logged in `external_data/harness/holdout_log.json` (entries at 2026-11-16T03:06:19, one each for degraded and clean tables):
+
+| tables | spell_f1 | macro | alive_dead_f1 | team | n_pred_spells |
+|---|---|---|---|---|---|
+| degraded | 0.115 | 0.797 | 0.950 | 0.746 | 1681 |
+| clean | 0.113 | 0.820 | 0.965 | 0.784 | n/a |
+
+- alive_dead_f1 matches in-sample (0.949 degraded): the alive/dead split transfers across matches.
+- spell_f1 sits inside the flat tuning band (0.111–0.122), so it says nothing either way about overfitting.
+
+**Second look: D-segment counts** (`features/external/dead_segment_counts.py`). Logged as predictor `dead_ball_v1_dsegment_counts` (2026-11-16T03:06:59). Nothing was changed in response to it. After this look the held-out pair is **no longer clean for judging any v2 change motivated by these counts**; a later held-out number would be reported as a further look.
+
+| split | tables | pred D segs | true D segs | pred < 1 s | pred D share | true D share |
+|---|---|---|---|---|---|---|
+| tune | degraded | 119.5 | 104.8 | 10.1% | 44.5% | 45.6% |
+| tune | clean | 143.6 | 104.8 | 13.2% | 42.4% | 45.6% |
+| holdout | degraded | 126.5 | 94.5 | 16.8% | 42.6% | 43.1% |
+| holdout | clean | 147.5 | 94.5 | 18.8% | 40.6% | 43.1% |
+
+**Proposed v2: a minimum D length of 1 s, chosen a priori** (design doc section 6: no stoppage is shorter than about 1 s). The support comes from the tuning matches alone: 14–37% more predicted D segments than true ones, and 10.1–13.2% of predicted segments under 1 s, while the true labels have almost none. A spurious short D segment splits a possession spell. Removing it can instead merge two spells; that effect is unmeasured. Awaiting a decision.
+
+**BAR-ATH plausibility** (`features/dead_ball_report.py`; label-free aggregates, no ground truth, no video):
+
+```
+graded frames 158857, predicted D share 43.1%
+  excluding the 2nd-half pre-kickoff span: D share 42.0%, 144 D segments
+  half 1: 65 D segments
+  half 2: 80 D segments
+  total 145 D segments (design doc: a match has roughly 100-120 restarts)
+  length s: shortest 0.08, quartiles 2.7 / 9.8 / 21.6, longest 221.2
+  shorter than 1 s: 13 (9.0%)
+  restart team: A 76, H 65, unknown 4
+  D segments overlapping any set-piece tag, any team incl. N/A (or within 1 s after): 78 / 145
+  D frames with the ball seen: 16.8%;  ball-missing graded frames called D: 88.1%
+```
+
+- **D share:** compare predicted with predicted. Without the pre-kickoff span (IDSSE periods start at kickoff), BAR-ATH is 42.0%, inside the IDSSE predicted split means (40.6–44.5%).
+- **Segments:** 144 is above the 100–120 restarts expected, as on IDSSE. Dropping the 13 under 1 s would leave about 131, still above the range.
+- **Set-piece overlap:** 78 / 145 is an upper bound on tag-based restart calls, because the window runs 1 s past the restart. Smart Tagging coverage of throw-ins and goal kicks is unknown, so this is weak evidence either way.
+- **Ball-missing frames:** 11.9% are called alive. No independent estimate of the live share of missing frames exists to compare it with.
