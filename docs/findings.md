@@ -278,3 +278,31 @@ graded frames 158857, predicted D share 43.1%
 - **Segments:** 144 is above the IDSSE true mean of 104.8 per tuning match (range 99–113), as on IDSSE. Dropping the 13 under 1 s would leave about 131, still above the range.
 - **Set-piece overlap:** 78 / 145 is an upper bound on tag-based restart calls, because the window runs 1 s past the restart. Smart Tagging coverage of throw-ins and goal kicks is unknown, so this is weak evidence either way.
 - **Ball-missing frames:** 11.9% are called alive. No independent estimate of the live share of missing frames exists to compare it with.
+
+## 2026-11-16: possession decoder v1 tuning (`features/external/tune_decoder.py`)
+
+Full grid over the six `decoder_*` keys (3^6 = 729 combos), degraded tuning tables, seeds 0 1 2 (15 runs), dead_* values frozen. Log: `external_data/decoder_tune/tune_log.json`. The objective and the tie rule were written to the log before any score. Tuning split only.
+
+| config | spell_f1_mean | macro_f1 | team acc (GT alive) | pred spells / match | true spells / match |
+|---|---|---|---|---|---|
+| dead_ball_v1 + nearest team (earlier) | 0.121 | 0.787 | 0.722 | 1715 | 454 |
+| decoder a priori | 0.277 | | | 181 | 454 |
+| decoder tuned | **0.381** | 0.827 | 0.781 | 289 | 454 |
+
+Chosen: margin_full 1.0 m (a priori 2.0), c_score 0.5 (1.0), switch 50 (50), c_entry 12 (25), c_exit 12 (25), restart_bias 50 (50). Best spell_f1 per value of each key (others free):
+
+| key | grid → best spell_f1 |
+|---|---|
+| margin_full_m | 1.0: .381, 2.0: .365, 4.0: .349 |
+| c_score | 0.0: .372, 0.5: .381, 1.0: .345 |
+| switch_penalty | 25/50/100: .381 (no effect at the chosen entry = exit = 12) |
+| c_entry_penalty | 12: .381, 25: .372, 50: .363 |
+| c_exit_penalty | 12: .381, 25: .372, 50: .363 |
+| restart_bias | 0: .375, 50/100: .381 |
+
+- In-sample numbers; the held-out pair is reserved for the one final evaluation of the full pipeline.
+- **Switch penalty and restart bias are not identified at the chosen values:** at c_entry = c_exit = 12 a change routed through C costs at most about 25 (24 in penalties plus at most 1 of score on the C frame), so switch 25/50/100 score the same, and so do restart_bias 50/100. At entry = exit 25 or 50 the switch penalty matters a lot (e.g. .359 / .330 / .267 at entry = exit 50).
+- The log was written by `tune_decoder.py` and `harness.py` as of commit 8ff58b2; later edits only changed which tune logs `frozen_config` checks, not the search.
+- **Three keys sit at their grid edge** (margin 1.0, c_entry 12, c_exit 12). The optimum may lie beyond them. The decoder now predicts fewer spells than the truth (289 vs 454), so lower entry/exit penalties may help further. Extending the grid is a second tuning run on the tuning split; not done without a decision.
+
+**BAR-ATH submission with the tuned decoder** (`features/make_submission.py`, validator OK, label-free aggregates): H 26.5%, A 18.9%, D 34.3%, X 20.3% of all frames; the validator counts 426 possessions of mean 8.5 s (a priori decoder: 224 of 16.1 s). Per match, IDSSE tuning has 454 true spells.

@@ -50,6 +50,7 @@ CONFIG_PATH = os.path.join(ROOT, "features", "config.json")
 HOLDOUT_LOG = os.path.join(EXT, "harness", "holdout_log.json")
 DEAD_BALL_TUNE_LOG = os.path.join(EXT, "dead_ball_tune", "tune_log.json")
 DEAD_BALL_MIN_DEAD_LOG = os.path.join(EXT, "dead_ball_tune", "tune_log_min_dead.json")
+DECODER_TUNE_LOG = os.path.join(EXT, "decoder_tune", "tune_log.json")
 LEAK_COLUMNS = ["label", "ball_dropped"]
 SEAM_ROWS = max(pm.TAUS) + 1
 SHOW = ["spell_f1_mean", "spell_f1_at_headline", "macro_f1", "alive_dead_f1",
@@ -108,25 +109,27 @@ def load_config():
     return cfg
 
 
-def frozen_config():
-    """load_config(), checked against both dead-ball tune logs (tune_dead_ball.frozen_from_log).
-    Every path that runs the tuned detector loads its config through here."""
+def frozen_config(decoder=True):
+    """load_config(), checked against both dead-ball tune logs and (decoder=True) the decoder tune
+    log (tune_dead_ball.frozen_from_log). Every path that runs the tuned pipeline loads its config
+    through here; only tune_decoder.py passes decoder=False."""
     import tune_dead_ball
     cfg = load_config()
     tune_dead_ball.frozen_from_log(DEAD_BALL_TUNE_LOG, cfg)
     tune_dead_ball.frozen_from_log(DEAD_BALL_MIN_DEAD_LOG, cfg)
+    if decoder:
+        tune_dead_ball.frozen_from_log(DECODER_TUNE_LOG, cfg)
     return cfg
 
 
 def dead_ball_v1(df):
     """features/dead_ball.py v1 with the values in config.json (frozen_config)."""
-    cfg = frozen_config()
+    cfg = frozen_config(decoder=False)
     return dead_ball.predict_labels(df, cfg, IDSSE_CTX)
 
 
 def decoder_v1(df):
-    """features/possession_decoder.py v1 with the values in config.json (frozen_config). The
-    decoder_* values are a priori until tune_decoder.py has been run."""
+    """features/possession_decoder.py v1 with the values in config.json (frozen_config)."""
     import possession_decoder
     cfg = frozen_config()
     return possession_decoder.decode(df, cfg, IDSSE_CTX)

@@ -31,7 +31,7 @@ from games import GAME, GAMES  # noqa: E402
 
 def main():
     derived = os.path.join(os.environ.get("MTAH_DATA_DIR") or os.path.join(ROOT, "data"), "derived")
-    cfg = harness.frozen_config()   # check_provenance + config equals the dead-ball tune logs
+    cfg = harness.frozen_config()   # check_provenance + config equals the dead-ball and decoder tune logs
     df = pd.read_parquet(os.path.join(derived, "features_tactical.parquet"))
     n = GAMES[GAME]["n_video_frames"]
     assert len(df) == n, "feature table has {} rows, expected {}".format(len(df), n)

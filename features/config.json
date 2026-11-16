@@ -43,11 +43,11 @@
   "dead_min_alive_frames": 25,
   "dead_min_dead_frames": 0,
 
-  "decoder_margin_full_m": 2.0,
-  "decoder_c_score": 1.0,
+  "decoder_margin_full_m": 1.0,
+  "decoder_c_score": 0.5,
   "decoder_switch_penalty": 50.0,
-  "decoder_c_entry_penalty": 25.0,
-  "decoder_c_exit_penalty": 25.0,
+  "decoder_c_entry_penalty": 12.0,
+  "decoder_c_exit_penalty": 12.0,
   "decoder_restart_bias": 50.0,
 
   "_provenance": {
@@ -289,46 +289,52 @@
       "tuned_on": null
     },
     "decoder_margin_full_m": {
-      "basis": "a_priori",
+      "basis": "tuned_external",
       "source": "possession decoder v1 (features/possession_decoder.py); main-session instruction 2026-11-16",
-      "reason": "Per-frame team score = clip(nearest_margin_m / this, -1, 1): +1 = home clearly closer, -1 = away. 2 m (about one stride) is where being closer stops being ambiguous: within it, a challenge or tracking error can swap the nearest player; beyond it, the closer team can play the ball first. Below the 3 m near-ball radius. Set before any decoder run.",
-      "tuned_on": null,
-      "revisit": "tune on degraded IDSSE (features/external/tune_decoder.py)"
+      "reason": "Per-frame team score = clip(nearest_margin_m / this, -1, 1): +1 = home clearly closer, -1 = away. 2 m (about one stride) is where being closer stops being ambiguous: within it, a challenge or tracking error can swap the nearest player; beyond it, the closer team can play the ball first. Below the 3 m near-ball radius. Set before any decoder run. A priori value 2.0. Tuned value 1.0 (2026-11-16: full grid over the six decoder_* keys, 729 combos; this key over [1.0, 2.0, 4.0]; objective: maximise mean spell_f1_mean over the 15 degraded runs (5 tuning matches x seeds [0, 1, 2]), harness.run -> pm.evaluate, with the dead_* values frozen; tie rule: among combos within 0.002 of the best mean spell_f1_mean, the one closest to the a priori values (sum over keys of |grid index - a priori grid index|), then the first in grid order). Chosen 1.0.",
+      "tuned_on": "IDSSE J03WMX, J03WN1, J03WOH, J03WOY, J03WQQ (degraded a priori ball-loss, seeds 0-2); held out J03WPY, J03WR9",
+      "target": "IDSSE DFL BallStatus/BallPossession proxy labels, spell_f1_mean via evaluation/possession_metrics.py. Never BAR-ATH GT or video.",
+      "tune_log": {"path": "external_data/decoder_tune/tune_log.json", "sha256": "cebb88d7214a8033607cf831963549d4e105cda75435c8dbe685193010deb4d5", "timestamp": "2026-11-16T10:33:01"}
     },
     "decoder_c_score": {
-      "basis": "a_priori",
+      "basis": "tuned_external",
       "source": "possession decoder v1 (features/possession_decoder.py); main-session instruction 2026-11-16",
-      "reason": "Per-frame score of the contested/loose state C where both teams, or neither, have a player within 3 m (a duel, or the ball in flight). 1.0 = as strong as a clear (>= 2 m margin) team frame: a duel or a ball in flight is as clear a sign that nobody controls it. Elsewhere C scores 0. C never splits a spell (its frames take the preceding team's label). Set before any decoder run.",
-      "tuned_on": null,
-      "revisit": "tune on degraded IDSSE (features/external/tune_decoder.py)"
+      "reason": "Per-frame score of the contested/loose state C where both teams, or neither, have a player within 3 m (a duel, or the ball in flight). 1.0 = as strong as a clear (>= 2 m margin) team frame: a duel or a ball in flight is as clear a sign that nobody controls it. Elsewhere C scores 0. C never splits a spell (its frames take the preceding team's label). Set before any decoder run. A priori value 1.0. Tuned value 0.5 (2026-11-16: full grid over the six decoder_* keys, 729 combos; this key over [0.0, 0.5, 1.0]; objective: maximise mean spell_f1_mean over the 15 degraded runs (5 tuning matches x seeds [0, 1, 2]), harness.run -> pm.evaluate, with the dead_* values frozen; tie rule: among combos within 0.002 of the best mean spell_f1_mean, the one closest to the a priori values (sum over keys of |grid index - a priori grid index|), then the first in grid order). Chosen 0.5.",
+      "tuned_on": "IDSSE J03WMX, J03WN1, J03WOH, J03WOY, J03WQQ (degraded a priori ball-loss, seeds 0-2); held out J03WPY, J03WR9",
+      "target": "IDSSE DFL BallStatus/BallPossession proxy labels, spell_f1_mean via evaluation/possession_metrics.py. Never BAR-ATH GT or video.",
+      "tune_log": {"path": "external_data/decoder_tune/tune_log.json", "sha256": "cebb88d7214a8033607cf831963549d4e105cda75435c8dbe685193010deb4d5", "timestamp": "2026-11-16T10:33:01"}
     },
     "decoder_switch_penalty": {
-      "basis": "a_priori",
+      "basis": "tuned_external",
       "source": "possession decoder v1 (features/possession_decoder.py); main-session instruction 2026-11-16",
-      "reason": "Viterbi cost of a direct H<->A switch, in per-frame score units. A clearly contrary frame costs 2 (from +1 to -1), so 50 = a switch needs about 1 s (25 frames) of clear contrary evidence: about a pass's flight time, so a ball passing near opponents does not flip possession, yet an order of magnitude below a typical possession of 10-15 s, so real changes still switch. The plain HMM rule log(spell length in frames) = log(300) ~ 6 would be far too small here: the per-frame scores are strongly autocorrelated, so a few frames of noise would switch. Set before any decoder run.",
-      "tuned_on": null,
-      "revisit": "tune on degraded IDSSE (features/external/tune_decoder.py)"
+      "reason": "Viterbi cost of a direct H<->A switch, in per-frame score units. A clearly contrary frame costs 2 (from +1 to -1), so 50 = a switch needs about 1 s (25 frames) of clear contrary evidence: about a pass's flight time, so a ball passing near opponents does not flip possession, yet an order of magnitude below a typical possession of 10-15 s, so real changes still switch. The plain HMM rule log(spell length in frames) = log(300) ~ 6 would be far too small here: the per-frame scores are strongly autocorrelated, so a few frames of noise would switch. Set before any decoder run. A priori value 50.0. Tuned value 50.0 (2026-11-16: full grid over the six decoder_* keys, 729 combos; this key over [25.0, 50.0, 100.0]; objective: maximise mean spell_f1_mean over the 15 degraded runs (5 tuning matches x seeds [0, 1, 2]), harness.run -> pm.evaluate, with the dead_* values frozen; tie rule: among combos within 0.002 of the best mean spell_f1_mean, the one closest to the a priori values (sum over keys of |grid index - a priori grid index|), then the first in grid order). Chosen 50.0.",
+      "tuned_on": "IDSSE J03WMX, J03WN1, J03WOH, J03WOY, J03WQQ (degraded a priori ball-loss, seeds 0-2); held out J03WPY, J03WR9",
+      "target": "IDSSE DFL BallStatus/BallPossession proxy labels, spell_f1_mean via evaluation/possession_metrics.py. Never BAR-ATH GT or video.",
+      "tune_log": {"path": "external_data/decoder_tune/tune_log.json", "sha256": "cebb88d7214a8033607cf831963549d4e105cda75435c8dbe685193010deb4d5", "timestamp": "2026-11-16T10:33:01"}
     },
     "decoder_c_entry_penalty": {
-      "basis": "a_priori",
+      "basis": "tuned_external",
       "source": "possession decoder v1 (features/possession_decoder.py); main-session instruction 2026-11-16",
-      "reason": "Viterbi cost of H/A -> C. Half the switch penalty, with decoder_c_exit_penalty the other half, so a change of team via a loose ball (H -> C -> A) costs the same as a direct switch: C changes where a switch lands (when the other team gains control), not how much evidence it needs. Set before any decoder run.",
-      "tuned_on": null,
-      "revisit": "tune on degraded IDSSE (features/external/tune_decoder.py)"
+      "reason": "Viterbi cost of H/A -> C. Half the switch penalty, with decoder_c_exit_penalty the other half, so a change of team via a loose ball (H -> C -> A) costs the same as a direct switch: C changes where a switch lands (when the other team gains control), not how much evidence it needs. Set before any decoder run. A priori value 25.0. Tuned value 12.0 (2026-11-16: full grid over the six decoder_* keys, 729 combos; this key over [12.0, 25.0, 50.0]; objective: maximise mean spell_f1_mean over the 15 degraded runs (5 tuning matches x seeds [0, 1, 2]), harness.run -> pm.evaluate, with the dead_* values frozen; tie rule: among combos within 0.002 of the best mean spell_f1_mean, the one closest to the a priori values (sum over keys of |grid index - a priori grid index|), then the first in grid order). Chosen 12.0.",
+      "tuned_on": "IDSSE J03WMX, J03WN1, J03WOH, J03WOY, J03WQQ (degraded a priori ball-loss, seeds 0-2); held out J03WPY, J03WR9",
+      "target": "IDSSE DFL BallStatus/BallPossession proxy labels, spell_f1_mean via evaluation/possession_metrics.py. Never BAR-ATH GT or video.",
+      "tune_log": {"path": "external_data/decoder_tune/tune_log.json", "sha256": "cebb88d7214a8033607cf831963549d4e105cda75435c8dbe685193010deb4d5", "timestamp": "2026-11-16T10:33:01"}
     },
     "decoder_c_exit_penalty": {
-      "basis": "a_priori",
+      "basis": "tuned_external",
       "source": "possession decoder v1 (features/possession_decoder.py); main-session instruction 2026-11-16",
-      "reason": "Viterbi cost of C -> H/A. The other half of the switch penalty (see decoder_c_entry_penalty). Set before any decoder run.",
-      "tuned_on": null,
-      "revisit": "tune on degraded IDSSE (features/external/tune_decoder.py)"
+      "reason": "Viterbi cost of C -> H/A. The other half of the switch penalty (see decoder_c_entry_penalty). Set before any decoder run. A priori value 25.0. Tuned value 12.0 (2026-11-16: full grid over the six decoder_* keys, 729 combos; this key over [12.0, 25.0, 50.0]; objective: maximise mean spell_f1_mean over the 15 degraded runs (5 tuning matches x seeds [0, 1, 2]), harness.run -> pm.evaluate, with the dead_* values frozen; tie rule: among combos within 0.002 of the best mean spell_f1_mean, the one closest to the a priori values (sum over keys of |grid index - a priori grid index|), then the first in grid order). Chosen 12.0.",
+      "tuned_on": "IDSSE J03WMX, J03WN1, J03WOH, J03WOY, J03WQQ (degraded a priori ball-loss, seeds 0-2); held out J03WPY, J03WR9",
+      "target": "IDSSE DFL BallStatus/BallPossession proxy labels, spell_f1_mean via evaluation/possession_metrics.py. Never BAR-ATH GT or video.",
+      "tune_log": {"path": "external_data/decoder_tune/tune_log.json", "sha256": "cebb88d7214a8033607cf831963549d4e105cda75435c8dbe685193010deb4d5", "timestamp": "2026-11-16T10:33:01"}
     },
     "decoder_restart_bias": {
-      "basis": "a_priori",
+      "basis": "tuned_external",
       "source": "possession decoder v1 (features/possession_decoder.py); main-session instruction 2026-11-16",
-      "reason": "When an alive span starts at a D segment whose restart_team is H or A, the other two states start this much lower. Laws 8, 13-17: the restart team plays the ball first, so starting with the other team is treated like a switch from the restart team: the same 50 as decoder_switch_penalty. Set before any decoder run.",
-      "tuned_on": null,
-      "revisit": "tune on degraded IDSSE (features/external/tune_decoder.py)"
+      "reason": "When an alive span starts at a D segment whose restart_team is H or A, the other two states start this much lower. Laws 8, 13-17: the restart team plays the ball first, so starting with the other team is treated like a switch from the restart team: the same 50 as decoder_switch_penalty. Set before any decoder run. A priori value 50.0. Tuned value 50.0 (2026-11-16: full grid over the six decoder_* keys, 729 combos; this key over [0.0, 50.0, 100.0]; objective: maximise mean spell_f1_mean over the 15 degraded runs (5 tuning matches x seeds [0, 1, 2]), harness.run -> pm.evaluate, with the dead_* values frozen; tie rule: among combos within 0.002 of the best mean spell_f1_mean, the one closest to the a priori values (sum over keys of |grid index - a priori grid index|), then the first in grid order). Chosen 50.0.",
+      "tuned_on": "IDSSE J03WMX, J03WN1, J03WOH, J03WOY, J03WQQ (degraded a priori ball-loss, seeds 0-2); held out J03WPY, J03WR9",
+      "target": "IDSSE DFL BallStatus/BallPossession proxy labels, spell_f1_mean via evaluation/possession_metrics.py. Never BAR-ATH GT or video.",
+      "tune_log": {"path": "external_data/decoder_tune/tune_log.json", "sha256": "cebb88d7214a8033607cf831963549d4e105cda75435c8dbe685193010deb4d5", "timestamp": "2026-11-16T10:33:01"}
     }
   }
 }

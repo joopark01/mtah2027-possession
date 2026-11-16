@@ -1,4 +1,4 @@
-"""Grid-tune the possession decoder's decoder_* keys on IDSSE (not yet run).
+"""Grid-tune the possession decoder's decoder_* keys on IDSSE (run 2026-11-16, log external_data/decoder_tune/tune_log.json).
 
     python features/external/tune_decoder.py --log external_data/decoder_tune/tune_log.json --workers 7
 
@@ -98,7 +98,7 @@ def tune(log_path, workers, ids=None, grid=GRID):
     if os.path.exists(log_path):
         raise SystemExit("{} exists: refusing to overwrite a tune log".format(log_path))
     ids = hz.split_ids("tune", False, ids)          # refuses held-out ids
-    cfg = hz.frozen_config()
+    cfg = hz.frozen_config(decoder=False)
     apriori = {k: cfg[k] for k in grid}
     for k in grid:
         assert apriori[k] in grid[k], "a priori {}={} not in its grid".format(k, apriori[k])
