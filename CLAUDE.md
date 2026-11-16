@@ -15,14 +15,15 @@ Fork of the organisers' repo (`upstream` = metrica-sports/more-than-a-hack-2027,
 - `features/external/fetch_idsse.py`: downloads the 7 IDSSE matches (CC BY 4.0, Bassek et al. 2025) to `external_data/idsse/` as compact npz files with per-frame ball alive/dead and owner labels. The raw XML is deleted after conversion.
 - `features/external/idsse_features.py`: same extractor code on each IDSSE npz → `external_data/idsse_features/<id>.parquet`, plus `label` (DFL BallStatus/BallPossession → H/A/D) and `frame_id`. `frame` is a row index there, and the periods are adjacent, so split on `half`.
 - `features/tests/`: synthetic-match tests. Run them after any change to the extractor:
-  `python features/tests/make_synthetic_match.py /tmp/synth && MTAH_DATA_DIR=/tmp/synth python features/tests/test_synthetic.py && python features/tests/test_fetch_checks.py && python features/tests/test_idsse_features.py && python features/tests/test_degrade_ball.py`
+  `python features/tests/make_synthetic_match.py /tmp/synth && MTAH_DATA_DIR=/tmp/synth python features/tests/test_synthetic.py && python features/tests/test_fetch_checks.py && python features/tests/test_idsse_features.py && python features/tests/test_degrade_ball.py && python features/tests/test_harness.py`
 
 ## State (2026-11-15)
 - **Feature table built on real data; parsing verified.** Ball seen 59.3%, tracked 20.49, matching DATA.md.
 - **Missing ball = mostly stoppages.** The ball is missing in long blocks (132 runs over 5 s, holding 99.7% of missing frames). These are mostly stoppages: players walk, set pieces follow, and the ball reappears moving at the restart.
 - **IDSSE feature tables built (7 matches).** The kickoff is the first alive row of each period; the signs match kloppy. Ball kinematics are masked at every block edge.
 - **Ball-loss simulation on IDSSE** (`features/external/degrade_ball.py`): a priori values (user's decision, 2026-11-15; not fitted to BAR-ATH). The 21 degraded tables in `external_data/idsse_degraded/` were rebuilt with them. The earlier BAR-ATH-fitted values are kept, unused, in `features/external/ball_loss_fitted_bar_ath.json` until the organisers confirm such fitting is allowed. Use them with `--ball-loss-params <file>`.
-- **Next:** the tuning harness, then the dead-ball detector (design in `docs/dead-ball-detector-design.md`; findings in `docs/findings.md`), tuned on IDSSE.
+- **Tuning harness** (`features/external/harness.py`): scores predictors on IDSSE with `pm.evaluate` and an X at the period seam. Held-out runs need `--holdout` and are logged to `external_data/harness/holdout_log.json`. `baseline_nearest` gets spell_f1_mean about 0.10 on tune data, degraded or clean (difference within noise). It predicts 4–4.6x too many spells. Degraded tables leak dead-ball edges by construction: don't tune D-edge offsets on them (`docs/findings.md`).
+- **Next:** dead-ball detector (design in `docs/dead-ball-detector-design.md`), tuned on IDSSE through the harness.
 
 ## Subagents (`.claude/agents/`)
 - **runner:** Bash only. Runs scripts on the provided match and reports aggregate output. Use it for every command that touches `data/`.

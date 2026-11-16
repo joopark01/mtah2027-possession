@@ -124,3 +124,27 @@ The onset lag mostly moves the seen share (about 3.5 pp per 2 s). The reacquisit
 - "Ball still 1 s after reappearing" is computed slightly differently for BAR-ATH (`diagnose_ball_gaps.py`: clipped at the array end, NaN counted as not still) and for the simulator (within the period, NaN skipped). The 2% vs 2.2% comparison is approximate. The metric is not in the loss.
 - The seen share varies by ±7 pp between matches and seeds, because each IDSSE match has its own dead share.
 - The BAR-ATH target includes 2 long runs (540 frames, 21.6 s, all inside the span) in the 2nd-half pre-kickoff block [110808, 113742), which IDSSE cannot produce because its periods start at kickoff. That is 0.34% of graded frames and about 1.5% of the long-run count: a known small mismatch, and TARGET is kept unchanged. It does not explain the 160 s+ shortfall.
+
+## 2026-11-15: tuning harness and trivial baseline (`features/external/harness.py`)
+
+Scoring is `evaluation/possession_metrics.py` (`pm.evaluate`). 26 X rows (one more than the widest transition tolerance) are inserted at the period seam in GT and prediction, so no spell or transition match crosses halftime. GT is the DFL proxy label. The predictor never sees `label` or `ball_dropped`. Degraded tables use the a priori ball-loss variant, 3 seeds each. Clean tables get one run per match. `baseline_nearest`: when the ball position is known, predict the nearest player's team; otherwise D.
+
+**Tune split (J03WMX, J03WN1, J03WOH, J03WOY, J03WQQ), mean (min–max) over runs:**
+
+| tables | runs | spell_f1_mean | spell_f1@0.5 | macro_f1 | alive_dead_f1 | team_acc_gt_alive | n_gt_spells | n_pred_spells | fragmentation |
+|---|---|---|---|---|---|---|---|---|---|
+| degraded | 15 | 0.106 (0.09–0.13) | 0.092 (0.08–0.11) | 0.724 (0.70–0.75) | 0.868 (0.84–0.90) | 0.624 (0.59–0.67) | 454 (401–511) | 1817 (1634–1980) | 3.54 (3.03–4.23) |
+| clean | 5 | 0.100 (0.08–0.12) | 0.086 (0.07–0.10) | 0.359 (0.33–0.38) | 0.704 (0.65–0.74) | 0.764 (0.75–0.78) | 454 (401–511) | 2092 (1981–2240) | 3.77 (3.32–4.43) |
+
+**HELD OUT (J03WPY, J03WR9). Evaluation only: nothing was tuned or selected on these numbers.** Both looks are logged in `external_data/harness/holdout_log.json`.
+
+| tables | runs | spell_f1_mean | spell_f1@0.5 | macro_f1 | alive_dead_f1 | team_acc_gt_alive | n_gt_spells | n_pred_spells | fragmentation |
+|---|---|---|---|---|---|---|---|---|---|
+| degraded | 6 | 0.103 (0.10–0.11) | 0.090 (0.09–0.09) | 0.757 (0.74–0.77) | 0.896 (0.89–0.91) | 0.681 (0.66–0.70) | 396 (370–421) | 1792 (1685–1886) | 3.93 (3.87–4.02) |
+| clean | 2 | 0.095 (0.09–0.10) | 0.083 (0.08–0.09) | 0.376 (0.37–0.39) | 0.725 (0.72–0.74) | 0.797 (0.79–0.81) | 396 (370–421) | 1991 (1864–2117) | 4.06 (4.03–4.09) |
+
+**Failure modes, read from the aggregates:**
+- **Fragmentation is the main failure.** The baseline predicts 4.0x (degraded) to 4.6x (clean) as many spells as the GT (n_pred_spells / n_gt_spells). Nearest-player identity flips during contests and passes, so spell_f1 stays near 0.1 even where the frame metrics look fine.
+- **The degraded tables score better than the clean ones on frames.** On clean tables the ball is always known, so the baseline never predicts D. That gives macro_f1 0.36 and alive_dead_f1 0.70, and the gap is all false alive during dead spans. On degraded tables a missing ball mostly means a dead span, so "missing → D" gets alive/dead right much of the time (alive_dead_f1 0.87). That is a property of the simulator, which hides the ball mostly in dead spans, and it says nothing about competence. With reacquisition lag 0 the restart edge is exact in the simulator, so degraded alive/dead scores are an optimistic bound for BAR-ATH, and D-edge offsets must not be tuned on degraded tables (they would recover the simulator's 50 and 0).
+- **Degraded vs clean spell_f1 (0.106 vs 0.100) is within noise** (SPELL_NOISE_BAND 0.04).
+- **The team call is the second error.** Team accuracy is 0.76 on clean tables, where the baseline predicts alive almost everywhere. On degraded tables it drops to 0.62, because alive frames with a hidden ball are predicted D and the strict metric counts them as wrong.

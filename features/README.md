@@ -74,6 +74,7 @@ MTAH_DATA_DIR=/tmp/synth python features/tests/test_synthetic.py
 python features/tests/test_fetch_checks.py      # IDSSE fetch checks
 python features/tests/test_idsse_features.py    # IDSSE feature adapter
 python features/tests/test_degrade_ball.py      # IDSSE ball-loss simulation
+python features/tests/test_harness.py           # IDSSE tuning harness
 ```
 
 This builds a full-length fake match with scripted events and checks the extracted features against the known answers. The events cover:
