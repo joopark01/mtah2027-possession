@@ -104,7 +104,7 @@ def refused(mutate, label):
     mutate(bad)
     try:
         ef.check_provenance(bad)
-    except AssertionError:
+    except ValueError:
         print("  ok  provenance refuses: {}".format(label))
         return
     raise AssertionError("check_provenance accepted a config with " + label)
@@ -117,7 +117,8 @@ refused(lambda c: c["_provenance"]["fps"].update(basis="vibes"), "an unknown bas
 refused(lambda c: c["_provenance"]["fps"].update(tuned_on="IDSSE"), "tuned_on without tuned_external")
 refused(lambda c: c["_provenance"]["fps"].update(basis="tuned_external", tuned_on=None),
         "tuned_external without a dataset")
-refused(lambda c: c["_provenance"]["fps"].update(basis="tuned_external", tuned_on="BAR-ATH public"),
+refused(lambda c: c["_provenance"]["fps"].update(basis="tuned_external", tuned_on="BAR-ATH public",
+                                                    target="x"),
         "tuning on the provided game")
 print("all provenance checks passed")
 

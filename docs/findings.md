@@ -47,11 +47,48 @@ Re-run on 2026-11-15; the numbers above reproduced exactly.
 - The period seam joins rows a halftime apart. Ball kinematics, stillness and jump counts are now masked at every block edge (in the shared extractor). Anything temporal on IDSSE must split on `half`.
 
 ## 2026-11-15: ball-loss simulation (`features/external/degrade_ball.py`)
-Imitates BAR-ATH's tracker on clean IDSSE ball tracking. Each DFL dead span maps to the gap [dead start + onset lag, restart + reacquisition lag). If that gap is at least 126 frames, it is dropped with probability p; a shorter one is dropped with a lower probability p_short. On top come Poisson live-play gaps (log-uniform length) and 1–12-frame flickers. Each (match, seed) gets its own RNG, `default_rng([seed, match_index])`. The target is BAR-ATH's **label-free tracking aggregates** (above and DATA.md), never GT.
+Imitates BAR-ATH's tracker on clean IDSSE ball tracking. Each DFL dead span maps to the gap [dead start + onset lag, restart + reacquisition lag). If that gap is at least 126 frames, it is dropped with probability p; a shorter one is dropped with a lower probability p_short. On top come Poisson live-play gaps (log-uniform length) and 1–12-frame flickers. Each (match, seed) gets its own RNG, `default_rng([seed, match_index])`.
+
+**Active simulator: a priori (decided 2026-11-15).** The user decided that the simulator must no longer be fitted to BAR-ATH aggregates. All 8 `ball_loss_*` values in `features/config.json` are now `a_priori`, with `tuned_on` null:
+
+| key | value | reason |
+|---|---|---|
+| `dead_drop_prob` | 1.0 | User's decision: a tactical-camera tracker loses the ball whenever it is dead for ≥ 5 s (held, off the pitch, out of shot). |
+| `short_gap_drop_prob` | 0.5 | No prior knowledge whether a brief stoppage (< 5 s) loses the ball, so the maximum-ignorance value. |
+| `onset_lag_frames` | 50 (2 s) | The tracker keeps following the ball for a moment after DFL marks it dead (rolling out, being collected). A round guess. |
+| `reacquisition_lag_frames` | 0 | Not identifiable; reappearance is taken to be the restart. Unchanged. |
+| `live_gaps_per_hour`, `live_gap_frames_range` | 30, [126, 500] (5–20 s) | Occlusion in crowds and on aerial balls. Nonzero on purpose, so that "ball missing" on degraded IDSSE is not a proxy for "dead" and a detector has to use player cues. A round guess. |
+| `flickers_per_hour`, `flicker_frames_range` | 10, [1, 12] | Brief detector dropouts. A round guess. |
+
+These values were chosen without fitting, but they are **not blind**: the authors had already seen BAR-ATH's tracking aggregates (above) and the earlier fitted values. They were fixed before the tables were rebuilt and were not revised afterwards. A build with only a priori keys does not need `tune_log.json`. Each output's provenance records `"ball_loss_variant": "a_priori"` (or the `--ball-loss-params` file path) and the full `degrade_params`.
+
+Rebuilt with `--all --seeds 0 1 2` (21 tables). Same layout as the fitted table below. The table is **descriptive only**: BAR-ATH is shown for comparison, nothing was changed in response, and the held-out numbers are reported separately.
+
+| | BAR-ATH (comparison only) | tuning (5 × 3) | held out (2 × 3, evaluation only) |
+|---|---|---|---|
+| ball seen | 59.3% | 48.6% (43–55% per run) | 52.4% |
+| runs ≥ 5 s | 132 | 157.9 | 138.2 |
+| share of missing frames in runs ≥ 5 s | 99.7% | 99.4% | 99.2% |
+| runs of 1–12 frames | ~16 | 18.0 | 21.1 |
+| runs of 13–125 frames | ~2 | 6.0 | 7.2 |
+| long-gap median | 11.6 s | 14.7 s | 15.4 s |
+| longest | 221.5 s | 134 s | 186 s |
+| bins 5-10 / 10-20 / 20-40 / 40-80 / 80-160 / 160+ s | 53 / 35 / 31 / 11 / 1 / 1 | 46.2 / 61.1 / 33.6 / 14.1 / 2.7 / 0.2 | 41.6 / 49.0 / 32.5 / 12.5 / 1.6 / 1.1 |
+| ball still 1 s after a long gap ends | 2% | 2.4% | 2.1% |
+
+On degraded IDSSE, both edges of every D spell that loses the ball are still fixed by simulator assumptions: the start by the a-priori onset lag of 2 s, the end by the reacquisition lag of 0. Boundary-placement results on degraded IDSSE inherit both.
+
+### Fitted variant (unused, pending organisers' confirmation)
+These are the earlier values, fitted to BAR-ATH's **label-free tracking aggregates** (above and DATA.md, never GT). They are kept with their full provenance (`tuned_external`, `tuned_on`, `target`, and the tune-log reference) in `features/external/ball_loss_fitted_bar_ath.json`. `external_data/idsse_degraded/tune_log.json` stays as their audit trail. To switch back, if the organisers confirm this is allowed:
+
+    python features/external/degrade_ball.py --all --seeds 0 1 2 \
+        --ball-loss-params features/external/ball_loss_fitted_bar_ath.json
+
+`--tune` and `--sensitivity` remain available. They write only the tune log or stdout, never `config.json`.
 
 **Tuning.** A full joint grid of 14,400 combinations ran on the 5 tuning matches × seeds 0, 1; the held-out matches were never loaded. Every row is in `external_data/idsse_degraded/tune_log.json` (2026-11-15T14:57). The config was frozen before the held-out run. Chosen: p 0.95, p_short 0.2, onset 100 frames (4 s), reacquisition 0 (a priori), 20 live gaps/h of 126–250 frames, 9 flickers/h. Every value is interior to its grid. The surface is flat near the optimum (the top 10 are within 0.45 of the best loss of 13.44), so the values are only weakly identified.
 
-Seeds 0–2. Counts are scaled to BAR-ATH's 158,857 graded frames. "Longest" is the mean over runs of each match's longest gap.
+Seeds 0–2, built 2026-11-15 before the switch. Counts are scaled to BAR-ATH's 158,857 graded frames. "Longest" is the mean over runs of each match's longest gap.
 
 | | target (BAR-ATH) | tuning (5 × 3) | held out (2 × 3, evaluation only) |
 |---|---|---|---|
@@ -65,7 +102,7 @@ Seeds 0–2. Counts are scaled to BAR-ATH's 158,857 graded frames. "Longest" is 
 | bins 5-10 / 10-20 / 20-40 / 40-80 / 80-160 / 160+ s | 53 / 35 / 31 / 11 / 1 / 1 | 53.3 / 32.1 / 27.8 / 11.9 / 1.9 / 0.2 | 45.5 / 23.8 / 29.5 / 11.6 / 1.6 / 1.1 |
 | ball still 1 s after a long gap ends | 2% | 2.2% | 1.8% |
 
-**Sensitivity** (`--sensitivity`, tuning matches × seeds 0, 1, other parameters as chosen):
+**Sensitivity** (`--sensitivity`, tuning matches × seeds 0, 1, other parameters at the fitted values; earlier build, before the a priori switch):
 
 | reacq (frames) | onset (frames) | seen | runs ≥ 5 s | 13–125 | median (s) | bins 5/10/20/40/80/160+ | still after |
 |---|---|---|---|---|---|---|---|
@@ -81,9 +118,9 @@ Seeds 0–2. Counts are scaled to BAR-ATH's 158,857 graded frames. "Longest" is 
 
 The onset lag mostly moves the seen share (about 3.5 pp per 2 s). The reacquisition lag moves almost nothing: 1 s of lag costs about 1.7 pp of seen share and leaves the "still after" share flat. **The aggregates cannot identify the reacquisition lag.** On degraded IDSSE, both edges of every D spell that loses the ball are therefore fixed by simulator assumptions: the start by the tuned onset lag, the end by the a-priori reacquisition lag of 0. Boundary-placement results on degraded IDSSE inherit both.
 
-**What still doesn't fit:**
+**What still didn't fit:**
 - Too few very long gaps (160 s+: 0.2 vs 1), and the median runs high (13.1 vs 11.6 s).
-- The held-out pair has fewer long runs (113 vs 132) and a mid-range dip (10–20 s: 24 vs 35). This is reported only: no simulator change will be made in response to held-out numbers. `--all` refuses to run unless the config equals the tune log's best row, and each output records the log's sha256 and timestamp.
+- The held-out pair has fewer long runs (113 vs 132) and a mid-range dip (10–20 s: 24 vs 35). This is reported only: no simulator change will be made in response to held-out numbers. With this variant, `--all` refuses to run unless the active values equal the tune log's best row, and each output records the log's sha256 and timestamp.
 - "Ball still 1 s after reappearing" is computed slightly differently for BAR-ATH (`diagnose_ball_gaps.py`: clipped at the array end, NaN counted as not still) and for the simulator (within the period, NaN skipped). The 2% vs 2.2% comparison is approximate. The metric is not in the loss.
 - The seen share varies by ±7 pp between matches and seeds, because each IDSSE match has its own dead share.
 - The BAR-ATH target includes 2 long runs (540 frames, 21.6 s, all inside the span) in the 2nd-half pre-kickoff block [110808, 113742), which IDSSE cannot produce because its periods start at kickoff. That is 0.34% of graded frames and about 1.5% of the long-run count: a known small mismatch, and TARGET is kept unchanged. It does not explain the 160 s+ shortfall.

@@ -118,11 +118,12 @@ def main():
     assert (bf["ball_still_frac"][100 - h:100] == 1.0).all(), "still_frac read the other block"
     # a held-out IDSSE match named as tuning data must be refused
     bad = json.loads(json.dumps(cfg))
-    bad["_provenance"]["fps"].update(basis="tuned_external", tuned_on="IDSSE J03WMX,J03WPY")
+    bad["_provenance"]["fps"].update(basis="tuned_external", tuned_on="IDSSE J03WMX,J03WPY",
+                                     target="x")
     try:
         ef.check_provenance(bad)
-    except AssertionError:
-        pass
+    except ValueError as e:
+        assert "held-out" in str(e), e
     else:
         raise AssertionError("check_provenance accepted a held-out match as tuning data")
     ok = json.loads(json.dumps(cfg))
@@ -134,7 +135,7 @@ def main():
     no_target["_provenance"]["fps"].pop("target")
     try:
         ef.check_provenance(no_target)
-    except AssertionError:
+    except ValueError:
         pass
     else:
         raise AssertionError("tuned_external without a target must be refused")

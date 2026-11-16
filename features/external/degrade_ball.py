@@ -3,6 +3,8 @@
     python features/external/degrade_ball.py --tune --seeds 0 1          # 5 tuning matches only
     python features/external/degrade_ball.py --sensitivity --seeds 0 1   # reacq x onset table
     python features/external/degrade_ball.py --all --seeds 0 1 2         # write degraded tables
+    python features/external/degrade_ball.py --all --seeds 0 1 2 \
+        --ball-loss-params features/external/ball_loss_fitted_bar_ath.json  # fitted variant
 
 Source: Bassek, Rein, Weber et al., "An integrated dataset of spatiotemporal and event data in
 elite soccer", Sci Data 12, 195 (2025), https://doi.org/10.1038/s41597-025-04505-y. Licence
@@ -18,7 +20,11 @@ picks it up again at the restart (docs/findings.md). The model, per period, in t
      uniformly inside live play with one free (alive, seen) frame on each side;
   3. flickers: same placement, uniform integer length in the frame range.
 Each (match, seed) has its own stream, np.random.default_rng([seed, match_index]).
-The target is BAR-ATH's label-free tracking aggregates (DATA.md, docs/findings.md), never GT.
+The active ball_loss_* values in config.json are a priori (2026-11-15). The earlier values fitted
+by --tune to BAR-ATH's label-free tracking aggregates (DATA.md, docs/findings.md; never GT) are
+kept, unused, in ball_loss_fitted_bar_ath.json and selected with --ball-loss-params, pending the
+organisers' confirmation that such fitting is allowed. TARGET below is the --tune objective and
+the comparison column of the printed tables; --tune and --sensitivity never write config.json.
 With these assumptions, BOTH edges of every D spell that loses the ball on degraded IDSSE are
 fixed by the simulator (onset lag and reacquisition lag), not observed.
 
@@ -227,6 +233,8 @@ def tune(in_dir, cfg, seeds, grid, log_path, workers):
     with concurrent.futures.ProcessPoolExecutor(workers, initializer=_init,
                                                 initargs=(data, fixed, seeds, list(grid))) as ex:
         losses = list(ex.map(_score, combos, chunksize=max(1, len(combos) // (8 * workers))))
+    if os.path.exists(log_path):  # the fitted variant cites this log; never overwrite it
+        raise SystemExit("{} exists; move it aside before re-tuning".format(log_path))
     rows = sorted(({"loss": l, **dict(zip(grid, c))} for l, c in zip(losses, combos)),
                   key=lambda r: np.inf if r["loss"] is None else r["loss"])
     with open(log_path, "w") as f:
@@ -290,6 +298,29 @@ def table(rows, label):
         DURATION_BINS_S[:-1], np.round(mean["bins"], 1).tolist(), TARGET["bins"]))
 
 
+def with_ball_loss_params(cfg, path):
+    """cfg with the 8 ball_loss_* values and their _provenance entries replaced by those in the
+    JSON file at path (same shape as config.json). The file must hold exactly PARAM_KEYS."""
+    with open(path) as f:
+        var = json.load(f)
+    got, prov = {k for k in var if not k.startswith("_")}, set(var["_provenance"])
+    if got != set(PARAM_KEYS) or prov != set(PARAM_KEYS):
+        raise ValueError("{} must hold exactly {} and their _provenance; has {} / {}".format(
+            path, PARAM_KEYS, sorted(got), sorted(prov)))
+    out = json.loads(json.dumps(cfg))
+    out.update({k: var[k] for k in PARAM_KEYS})
+    out["_provenance"].update(var["_provenance"])
+    return out
+
+
+def variant_stamp(cfg, params_path, log_path):
+    """Provenance stamp for each output. If any active ball_loss key is tuned_external, the config
+    must match the tune log (frozen_from_log); otherwise the tune log is not needed."""
+    if any(cfg["_provenance"][k]["basis"] == "tuned_external" for k in PARAM_KEYS):
+        return dict(frozen_from_log(log_path, cfg), ball_loss_variant=params_path or "config.json")
+    return {"ball_loss_variant": params_path or "a_priori"}
+
+
 def frozen_from_log(log_path, cfg):
     """Rule 2 audit trail: the config must equal the tune log's best row before any table (held-out
     ones included) is built. Returns the log's sha256 and timestamp for each output's provenance."""
@@ -298,7 +329,8 @@ def frozen_from_log(log_path, cfg):
     with open(log_path) as f:
         log = json.load(f)
     best = log["results"][0]
-    diff = {k: (cfg[k], v) for k, v in best.items() if k != "loss" and cfg[k] != v}
+    diff = {k: (cfg[k], v) for k, v in dict(log["fixed"], **best).items()
+            if k != "loss" and cfg[k] != v}
     if diff:
         raise SystemExit("config differs from the tune log's best row (config, log): {}".format(diff))
     return {"tune_log_sha256": idf.sha256(log_path), "tune_log_timestamp": log["timestamp"]}
@@ -348,15 +380,22 @@ def main():
     parser.add_argument("--config", default=os.path.join(ROOT, "features", "config.json"))
     parser.add_argument("--in-dir", default=os.path.join(ROOT, "external_data", "idsse"))
     parser.add_argument("--out-dir", default=os.path.join(ROOT, "external_data", "idsse_degraded"))
+    parser.add_argument("--ball-loss-params", default=None, metavar="FILE",
+                        help="override the ball_loss_* keys and provenance (e.g. "
+                             "features/external/ball_loss_fitted_bar_ath.json); none = config.json")
     args = parser.parse_args()
     with open(args.config) as f:
         cfg = json.load(f)
+    if args.ball_loss_params:
+        cfg = with_ball_loss_params(cfg, args.ball_loss_params)
     ef.check_provenance(cfg)
+    print("ball-loss variant: {}".format(args.ball_loss_params or "config.json"))
     print("data: " + SOURCE)
     provided = str(pathlib.Path(ROOT, "data").resolve()).casefold()
-    out = pathlib.Path(args.out_dir).resolve()
-    if provided in (str(q).casefold() for q in (out, *out.parents)):
-        raise SystemExit("external data must not go under data/ (reserved for the provided match)")
+    for d in (args.in_dir, args.out_dir):
+        d = pathlib.Path(d).resolve()
+        if provided in (str(q).casefold() for q in (d, *d.parents)):
+            raise SystemExit("external data must not be under data/ (reserved for the provided match)")
     os.makedirs(args.out_dir, exist_ok=True)
     if args.tune:
         tune(args.in_dir, cfg, args.seeds, GRID, os.path.join(args.out_dir, "tune_log.json"),
@@ -368,7 +407,7 @@ def main():
     ids = list(MATCHES) if args.all else args.matches
     if not ids or set(ids) - set(MATCHES):
         parser.error("name match ids from {} or pass --all".format(list(MATCHES)))
-    frozen = frozen_from_log(os.path.join(args.out_dir, "tune_log.json"), cfg)
+    frozen = variant_stamp(cfg, args.ball_loss_params, os.path.join(args.out_dir, "tune_log.json"))
     res = {m: [build(m, s, args.in_dir, args.out_dir, cfg, frozen) for s in args.seeds]
            for m in ids}
     for label, group in (("TUNING matches", ef.IDSSE_TUNE),

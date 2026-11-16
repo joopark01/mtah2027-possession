@@ -21,13 +21,13 @@
 
   "smart_tagging_team_map": {"Barcelona": "H", "Atletic Club": "A", "N/A": "NA"},
 
-  "ball_loss_dead_drop_prob": 0.95,
-  "ball_loss_short_gap_drop_prob": 0.2,
-  "ball_loss_onset_lag_frames": 100,
+  "ball_loss_dead_drop_prob": 1.0,
+  "ball_loss_short_gap_drop_prob": 0.5,
+  "ball_loss_onset_lag_frames": 50,
   "ball_loss_reacquisition_lag_frames": 0,
-  "ball_loss_live_gaps_per_hour": 20,
-  "ball_loss_live_gap_frames_range": [126, 250],
-  "ball_loss_flickers_per_hour": 9.0,
+  "ball_loss_live_gaps_per_hour": 30,
+  "ball_loss_live_gap_frames_range": [126, 500],
+  "ball_loss_flickers_per_hour": 10,
   "ball_loss_flicker_frames_range": [1, 12],
 
   "_provenance": {
@@ -134,57 +134,51 @@
       "tuned_on": null
     },
     "ball_loss_dead_drop_prob": {
-      "basis": "tuned_external",
-      "target": "BAR-ATH label-free tracking aggregates (ball-seen share and missing-run length histogram, docs/findings.md); simulated on IDSSE DFL dead spans. Never the GT or the video.",
-      "source": "features/external/degrade_ball.py --tune",
-      "reason": "Ball-loss simulation only (degrade_ball.py): probability that a DFL dead span whose gap would be >= 126 frames is dropped. Chosen 0.95. Selected by degrade_ball.py --tune (log external_data/idsse_degraded/tune_log.json, 2026-11-15T14:57:25.445091-05:00): full joint grid of 14,400 combinations, 0 infeasible, on the 5 tuning matches x seeds 0,1 (default_rng([seed, match_index])); held-out matches never loaded. Objective: mean of sum (sim - t)^2 / max(t, 1) over long-gap (>= 126 frames) counts in bins 5-10/10-20/20-40/40-80/80-160/160+ s and 1-12 and 13-125 frame run counts (targets scaled to match length), plus ((seen - 0.593)/0.02)^2; best loss 13.44. Grid: drop prob {0.85,0.9,0.95,1.0}; short-gap drop prob {0,0.05,0.1,0.2,0.3,0.5}; onset lag {50,75,100,125,150} frames; live gaps/h {15,20,25,30,35,40}; live gap range [126,150]/[126,180]/[126,250]/[126,500]; flickers/h {0,3,6,9,12}. Every chosen value is interior to its grid (bracketed). The surface is flat near the optimum (top 10 within 0.45 loss), so values are weakly identified.",
-      "tuned_on": "IDSSE J03WMX,J03WN1,J03WOH,J03WOY,J03WQQ; held out J03WPY,J03WR9"
+      "basis": "a_priori",
+      "source": "user/main-session decision 2026-11-15 (docs/findings.md, ball-loss section)",
+      "reason": "Ball-loss simulation on IDSSE only (features/external/degrade_ball.py). Probability that a DFL dead span whose gap is >= 126 frames (5 s) loses the ball: 1.0. User's decision: a tactical-camera ball tracker is assumed to lose the ball whenever it is dead for 5 s or more (a player holds it, it is off the pitch, or out of shot). Chosen without fitting; but the authors had already seen BAR-ATH's label-free tracking aggregates (docs/findings.md) and the earlier BAR-ATH-fitted values (features/external/ball_loss_fitted_bar_ath.json), so the choice is not blind. Fixed 2026-11-15 before rebuilding the degraded tables and not revised after seeing them.",
+      "tuned_on": null
     },
     "ball_loss_short_gap_drop_prob": {
-      "basis": "tuned_external",
-      "target": "BAR-ATH label-free tracking aggregates (ball-seen share and missing-run length histogram, docs/findings.md); simulated on IDSSE DFL dead spans. Never the GT or the video.",
-      "source": "features/external/degrade_ball.py --tune",
-      "reason": "Ball-loss simulation only: probability that a dead span whose gap would be 1-125 frames is dropped (BAR-ATH has about 2 runs of 13-125 frames). Chosen 0.2. Selected by degrade_ball.py --tune (log external_data/idsse_degraded/tune_log.json, 2026-11-15T14:57:25.445091-05:00): full joint grid of 14,400 combinations, 0 infeasible, on the 5 tuning matches x seeds 0,1 (default_rng([seed, match_index])); held-out matches never loaded. Objective: mean of sum (sim - t)^2 / max(t, 1) over long-gap (>= 126 frames) counts in bins 5-10/10-20/20-40/40-80/80-160/160+ s and 1-12 and 13-125 frame run counts (targets scaled to match length), plus ((seen - 0.593)/0.02)^2; best loss 13.44. Grid: drop prob {0.85,0.9,0.95,1.0}; short-gap drop prob {0,0.05,0.1,0.2,0.3,0.5}; onset lag {50,75,100,125,150} frames; live gaps/h {15,20,25,30,35,40}; live gap range [126,150]/[126,180]/[126,250]/[126,500]; flickers/h {0,3,6,9,12}. Every chosen value is interior to its grid (bracketed). The surface is flat near the optimum (top 10 within 0.45 loss), so values are weakly identified.",
-      "tuned_on": "IDSSE J03WMX,J03WN1,J03WOH,J03WOY,J03WQQ; held out J03WPY,J03WR9"
+      "basis": "a_priori",
+      "source": "user/main-session decision 2026-11-15 (docs/findings.md, ball-loss section)",
+      "reason": "Ball-loss simulation on IDSSE only (features/external/degrade_ball.py). Probability that a dead span whose gap is 1-125 frames (under 5 s) loses the ball: 0.5. There is no prior knowledge whether a brief stoppage loses the ball, so the maximum-ignorance value. Chosen without fitting; but the authors had already seen BAR-ATH's label-free tracking aggregates (docs/findings.md) and the earlier BAR-ATH-fitted values (features/external/ball_loss_fitted_bar_ath.json), so the choice is not blind. Fixed 2026-11-15 before rebuilding the degraded tables and not revised after seeing them.",
+      "tuned_on": null
     },
     "ball_loss_onset_lag_frames": {
-      "basis": "tuned_external",
-      "target": "BAR-ATH label-free tracking aggregates (ball-seen share and missing-run length histogram, docs/findings.md); simulated on IDSSE DFL dead spans. Never the GT or the video.",
-      "source": "features/external/degrade_ball.py --tune",
-      "reason": "Ball-loss simulation only: a dropped dead span starts this many frames after the DFL dead start. Chosen 100 (4 s). Selected by degrade_ball.py --tune (log external_data/idsse_degraded/tune_log.json, 2026-11-15T14:57:25.445091-05:00): full joint grid of 14,400 combinations, 0 infeasible, on the 5 tuning matches x seeds 0,1 (default_rng([seed, match_index])); held-out matches never loaded. Objective: mean of sum (sim - t)^2 / max(t, 1) over long-gap (>= 126 frames) counts in bins 5-10/10-20/20-40/40-80/80-160/160+ s and 1-12 and 13-125 frame run counts (targets scaled to match length), plus ((seen - 0.593)/0.02)^2; best loss 13.44. Grid: drop prob {0.85,0.9,0.95,1.0}; short-gap drop prob {0,0.05,0.1,0.2,0.3,0.5}; onset lag {50,75,100,125,150} frames; live gaps/h {15,20,25,30,35,40}; live gap range [126,150]/[126,180]/[126,250]/[126,500]; flickers/h {0,3,6,9,12}. Every chosen value is interior to its grid (bracketed). The surface is flat near the optimum (top 10 within 0.45 loss), so values are weakly identified.",
-      "tuned_on": "IDSSE J03WMX,J03WN1,J03WOH,J03WOY,J03WQQ; held out J03WPY,J03WR9"
+      "basis": "a_priori",
+      "source": "user/main-session decision 2026-11-15 (docs/findings.md, ball-loss section)",
+      "reason": "Ball-loss simulation on IDSSE only (features/external/degrade_ball.py). A dropped dead span starts this many frames after DFL marks the ball dead: 50 (2 s). The tracker keeps following the ball for a moment after it goes dead (rolling out, being collected); a round guess. Chosen without fitting; but the authors had already seen BAR-ATH's label-free tracking aggregates (docs/findings.md) and the earlier BAR-ATH-fitted values (features/external/ball_loss_fitted_bar_ath.json), so the choice is not blind. Fixed 2026-11-15 before rebuilding the degraded tables and not revised after seeing them.",
+      "tuned_on": null
     },
     "ball_loss_reacquisition_lag_frames": {
       "basis": "a_priori",
-      "source": "docs/dead-ball-detector-design.md section 3",
-      "reason": "Ball-loss simulation (features/external/degrade_ball.py) only: a dropped dead span ends at the restart (first DFL alive row) plus this lag. On BAR-ATH the ball reappears at about the restart (docs/findings.md: only 2% still over the next second). Not measurable externally, so 0 a priori; flagged as a risk.",
+      "source": "user/main-session decision 2026-11-15 (docs/findings.md, ball-loss section)",
+      "reason": "Ball-loss simulation on IDSSE only (features/external/degrade_ball.py). A dropped dead span ends at the restart (first DFL alive row) plus this lag: 0. Not identifiable from any data we may use; the reappearance is taken to be the restart. Flagged as a risk: both edges of a simulated loss are fixed by the simulator, not observed. Chosen without fitting; but the authors had already seen BAR-ATH's label-free tracking aggregates (docs/findings.md) and the earlier BAR-ATH-fitted values (features/external/ball_loss_fitted_bar_ath.json), so the choice is not blind. Fixed 2026-11-15 before rebuilding the degraded tables and not revised after seeing them.",
       "tuned_on": null
     },
     "ball_loss_live_gaps_per_hour": {
-      "basis": "tuned_external",
-      "target": "BAR-ATH label-free tracking aggregates (ball-seen share and missing-run length histogram, docs/findings.md); simulated on IDSSE DFL dead spans. Never the GT or the video.",
-      "source": "features/external/degrade_ball.py --tune",
-      "reason": "Ball-loss simulation only: Poisson rate of long gaps inside live play, per hour of period. Chosen 20. Selected by degrade_ball.py --tune (log external_data/idsse_degraded/tune_log.json, 2026-11-15T14:57:25.445091-05:00): full joint grid of 14,400 combinations, 0 infeasible, on the 5 tuning matches x seeds 0,1 (default_rng([seed, match_index])); held-out matches never loaded. Objective: mean of sum (sim - t)^2 / max(t, 1) over long-gap (>= 126 frames) counts in bins 5-10/10-20/20-40/40-80/80-160/160+ s and 1-12 and 13-125 frame run counts (targets scaled to match length), plus ((seen - 0.593)/0.02)^2; best loss 13.44. Grid: drop prob {0.85,0.9,0.95,1.0}; short-gap drop prob {0,0.05,0.1,0.2,0.3,0.5}; onset lag {50,75,100,125,150} frames; live gaps/h {15,20,25,30,35,40}; live gap range [126,150]/[126,180]/[126,250]/[126,500]; flickers/h {0,3,6,9,12}. Every chosen value is interior to its grid (bracketed). The surface is flat near the optimum (top 10 within 0.45 loss), so values are weakly identified.",
-      "tuned_on": "IDSSE J03WMX,J03WN1,J03WOH,J03WOY,J03WQQ; held out J03WPY,J03WR9"
+      "basis": "a_priori",
+      "source": "user/main-session decision 2026-11-15 (docs/findings.md, ball-loss section)",
+      "reason": "Ball-loss simulation on IDSSE only (features/external/degrade_ball.py). Poisson rate of long ball losses inside live play, per hour of period: 30 (occlusion in crowds, aerial balls). Deliberately nonzero so that on degraded IDSSE 'ball missing' is not a proxy for 'dead' and a dead-ball detector must use player cues. A round guess. Chosen without fitting; but the authors had already seen BAR-ATH's label-free tracking aggregates (docs/findings.md) and the earlier BAR-ATH-fitted values (features/external/ball_loss_fitted_bar_ath.json), so the choice is not blind. Fixed 2026-11-15 before rebuilding the degraded tables and not revised after seeing them.",
+      "tuned_on": null
     },
     "ball_loss_live_gap_frames_range": {
-      "basis": "tuned_external",
-      "target": "BAR-ATH label-free tracking aggregates (ball-seen share and missing-run length histogram, docs/findings.md); simulated on IDSSE DFL dead spans. Never the GT or the video.",
-      "source": "features/external/degrade_ball.py --tune",
-      "reason": "Ball-loss simulation only: live-gap length, log-uniform between these frame counts (126 = the 5 s long-gap edge, fixed lower bound). Chosen [126, 250]. Selected by degrade_ball.py --tune (log external_data/idsse_degraded/tune_log.json, 2026-11-15T14:57:25.445091-05:00): full joint grid of 14,400 combinations, 0 infeasible, on the 5 tuning matches x seeds 0,1 (default_rng([seed, match_index])); held-out matches never loaded. Objective: mean of sum (sim - t)^2 / max(t, 1) over long-gap (>= 126 frames) counts in bins 5-10/10-20/20-40/40-80/80-160/160+ s and 1-12 and 13-125 frame run counts (targets scaled to match length), plus ((seen - 0.593)/0.02)^2; best loss 13.44. Grid: drop prob {0.85,0.9,0.95,1.0}; short-gap drop prob {0,0.05,0.1,0.2,0.3,0.5}; onset lag {50,75,100,125,150} frames; live gaps/h {15,20,25,30,35,40}; live gap range [126,150]/[126,180]/[126,250]/[126,500]; flickers/h {0,3,6,9,12}. Every chosen value is interior to its grid (bracketed). The surface is flat near the optimum (top 10 within 0.45 loss), so values are weakly identified.",
-      "tuned_on": "IDSSE J03WMX,J03WN1,J03WOH,J03WOY,J03WQQ; held out J03WPY,J03WR9"
+      "basis": "a_priori",
+      "source": "user/main-session decision 2026-11-15 (docs/findings.md, ball-loss section)",
+      "reason": "Ball-loss simulation on IDSSE only (features/external/degrade_ball.py). Live-play loss length, log-uniform between these frame counts: [126, 500] (5-20 s; 126 is the long-gap edge). Same reasoning as ball_loss_live_gaps_per_hour; a round guess. Chosen without fitting; but the authors had already seen BAR-ATH's label-free tracking aggregates (docs/findings.md) and the earlier BAR-ATH-fitted values (features/external/ball_loss_fitted_bar_ath.json), so the choice is not blind. Fixed 2026-11-15 before rebuilding the degraded tables and not revised after seeing them.",
+      "tuned_on": null
     },
     "ball_loss_flickers_per_hour": {
-      "basis": "tuned_external",
-      "target": "BAR-ATH label-free tracking aggregates (ball-seen share and missing-run length histogram, docs/findings.md); simulated on IDSSE DFL dead spans. Never the GT or the video.",
-      "source": "features/external/degrade_ball.py --tune",
-      "reason": "Ball-loss simulation only: Poisson rate of 1-12-frame flickers in live play, per hour of period. Chosen 9. Selected by degrade_ball.py --tune (log external_data/idsse_degraded/tune_log.json, 2026-11-15T14:57:25.445091-05:00): full joint grid of 14,400 combinations, 0 infeasible, on the 5 tuning matches x seeds 0,1 (default_rng([seed, match_index])); held-out matches never loaded. Objective: mean of sum (sim - t)^2 / max(t, 1) over long-gap (>= 126 frames) counts in bins 5-10/10-20/20-40/40-80/80-160/160+ s and 1-12 and 13-125 frame run counts (targets scaled to match length), plus ((seen - 0.593)/0.02)^2; best loss 13.44. Grid: drop prob {0.85,0.9,0.95,1.0}; short-gap drop prob {0,0.05,0.1,0.2,0.3,0.5}; onset lag {50,75,100,125,150} frames; live gaps/h {15,20,25,30,35,40}; live gap range [126,150]/[126,180]/[126,250]/[126,500]; flickers/h {0,3,6,9,12}. Every chosen value is interior to its grid (bracketed). The surface is flat near the optimum (top 10 within 0.45 loss), so values are weakly identified.",
-      "tuned_on": "IDSSE J03WMX,J03WN1,J03WOH,J03WOY,J03WQQ; held out J03WPY,J03WR9"
+      "basis": "a_priori",
+      "source": "user/main-session decision 2026-11-15 (docs/findings.md, ball-loss section)",
+      "reason": "Ball-loss simulation on IDSSE only (features/external/degrade_ball.py). Poisson rate of brief detector dropouts in live play, per hour of period: 10. A round guess. Chosen without fitting; but the authors had already seen BAR-ATH's label-free tracking aggregates (docs/findings.md) and the earlier BAR-ATH-fitted values (features/external/ball_loss_fitted_bar_ath.json), so the choice is not blind. Fixed 2026-11-15 before rebuilding the degraded tables and not revised after seeing them.",
+      "tuned_on": null
     },
     "ball_loss_flicker_frames_range": {
       "basis": "a_priori",
-      "source": "docs/findings.md 2026-11-09 (BAR-ATH label-free tracking aggregate: about 16 missing runs of 1-12 frames, almost none of 13-125)",
-      "reason": "Ball-loss simulation only: flicker lengths are uniform on 1..12 frames inclusive, the short-run bin of the BAR-ATH tracking histogram. The target is a label-free tracking aggregate, never GT.",
+      "source": "user/main-session decision 2026-11-15 (docs/findings.md, ball-loss section)",
+      "reason": "Ball-loss simulation on IDSSE only (features/external/degrade_ball.py). Flicker length, uniform on these frame counts inclusive: [1, 12] (up to about half a second, the extractor's ball interpolation limit). A round guess. Chosen without fitting; but the authors had already seen BAR-ATH's label-free tracking aggregates (docs/findings.md) and the earlier BAR-ATH-fitted values (features/external/ball_loss_fitted_bar_ath.json), so the choice is not blind. Fixed 2026-11-15 before rebuilding the degraded tables and not revised after seeing them.",
       "tuned_on": null
     }
   }

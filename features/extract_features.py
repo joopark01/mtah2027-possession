@@ -485,28 +485,34 @@ def check_provenance(cfg):
     keys = {k for k in cfg if not k.startswith("_")}
     prov = cfg["_provenance"]
     missing, orphan = keys - set(prov), set(prov) - keys
-    assert not missing, "config keys without provenance: {}".format(sorted(missing))
-    assert not orphan, "provenance for keys not in config: {}".format(sorted(orphan))
+    if missing:
+        raise ValueError("config keys without provenance: {}".format(sorted(missing)))
+    if orphan:
+        raise ValueError("provenance for keys not in config: {}".format(sorted(orphan)))
     for key, entry in prov.items():
         absent = PROVENANCE_FIELDS - set(entry)
-        assert not absent, "provenance of {!r} lacks {}".format(key, sorted(absent))
-        assert entry["basis"] in PROVENANCE_BASES, "provenance of {!r}: basis {!r} not in {}".format(
-            key, entry["basis"], sorted(PROVENANCE_BASES))
+        if absent:
+            raise ValueError("provenance of {!r} lacks {}".format(key, sorted(absent)))
+        if entry["basis"] not in PROVENANCE_BASES:
+            raise ValueError("provenance of {!r}: basis {!r} not in {}".format(
+                key, entry["basis"], sorted(PROVENANCE_BASES)))
         tuned = entry["tuned_on"]
         if entry["basis"] == "tuned_external":
-            assert tuned, "{!r} is tuned_external but names no dataset".format(key)
+            if not tuned:
+                raise ValueError("{!r} is tuned_external but names no dataset".format(key))
             # what the objective matched, e.g. IDSSE labels, or BAR-ATH label-free tracking
             # aggregates; must never be the GT or the video
-            assert entry.get("target"), "{!r} is tuned_external but states no target".format(key)
-            assert "BAR-ATH" not in str(tuned), \
-                "{!r} claims tuning on the provided game -- not allowed".format(key)
+            if not entry.get("target"):
+                raise ValueError("{!r} is tuned_external but states no target".format(key))
+            if "BAR-ATH" in str(tuned):
+                raise ValueError("{!r} claims tuning on the provided game -- not allowed".format(key))
             # IDSSE split (CLAUDE.md): before "held out", only the five tuning matches may appear
             tuned_part = str(tuned).split("held out")[0]
             named = {m for m in IDSSE_TUNE + IDSSE_HOLDOUT if m in tuned_part}
-            assert named <= set(IDSSE_TUNE), \
-                "{!r} names a held-out IDSSE match as tuning data".format(key)
-        else:
-            assert tuned is None, "{!r} has tuned_on but basis {!r}".format(key, entry["basis"])
+            if not named <= set(IDSSE_TUNE):
+                raise ValueError("{!r} names a held-out IDSSE match as tuning data".format(key))
+        elif tuned is not None:
+            raise ValueError("{!r} has tuned_on but basis {!r}".format(key, entry["basis"]))
 
 
 # -- driver -------------------------------------------------------------------------------------

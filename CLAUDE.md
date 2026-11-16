@@ -21,7 +21,7 @@ Fork of the organisers' repo (`upstream` = metrica-sports/more-than-a-hack-2027,
 - **Feature table built on real data; parsing verified.** Ball seen 59.3%, tracked 20.49, matching DATA.md.
 - **Missing ball = mostly stoppages.** The ball is missing in long blocks (132 runs over 5 s, holding 99.7% of missing frames). These are mostly stoppages: players walk, set pieces follow, and the ball reappears moving at the restart.
 - **IDSSE feature tables built (7 matches).** The kickoff is the first alive row of each period; the signs match kloppy. Ball kinematics are masked at every block edge.
-- **Ball-loss simulation on IDSSE** (`features/external/degrade_ball.py`): tuned on the 5 tuning matches to BAR-ATH label-free gap aggregates; 21 degraded tables in `external_data/idsse_degraded/`.
+- **Ball-loss simulation on IDSSE** (`features/external/degrade_ball.py`): a priori values (user's decision, 2026-11-15; not fitted to BAR-ATH). The 21 degraded tables in `external_data/idsse_degraded/` were rebuilt with them. The earlier BAR-ATH-fitted values are kept, unused, in `features/external/ball_loss_fitted_bar_ath.json` until the organisers confirm such fitting is allowed. Use them with `--ball-loss-params <file>`.
 - **Next:** the tuning harness, then the dead-ball detector (design in `docs/dead-ball-detector-design.md`; findings in `docs/findings.md`), tuned on IDSSE.
 
 ## Subagents (`.claude/agents/`)

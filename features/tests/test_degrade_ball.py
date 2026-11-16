@@ -152,6 +152,37 @@ def main():
             assert "shape" in str(e), e
         else:
             raise AssertionError("wrong-shape ball_override must fail")
+
+    # --ball-loss-params: the fitted variant replaces exactly the 8 keys and their provenance and
+    # still passes check_provenance; an a priori build needs no tune log, a tuned one does
+    fitted_path = os.path.join(HERE, "..", "external", "ball_loss_fitted_bar_ath.json")
+    with open(fitted_path) as f:
+        fitted = json.load(f)
+    fc = db.with_ball_loss_params(cfg, fitted_path)
+    db.ef.check_provenance(fc)
+    for k in db.PARAM_KEYS:
+        assert fc[k] == fitted[k] and fc["_provenance"][k] == fitted["_provenance"][k], k
+    assert {k: v for k, v in fc.items() if k not in db.PARAM_KEYS and k != "_provenance"} == \
+        {k: v for k, v in cfg.items() if k not in db.PARAM_KEYS and k != "_provenance"}
+    assert all(cfg["_provenance"][k]["basis"] != "tuned_external" for k in db.PARAM_KEYS)
+    with tempfile.TemporaryDirectory() as tmp:
+        absent_log = os.path.join(tmp, "tune_log.json")
+        assert db.variant_stamp(cfg, None, absent_log) == {"ball_loss_variant": "a_priori"}
+        try:
+            db.variant_stamp(fc, fitted_path, absent_log)
+        except SystemExit:
+            pass
+        else:
+            raise AssertionError("a tuned_external build without tune_log.json must fail")
+        bad = dict(fitted, ball_loss_extra=1)
+        with open(os.path.join(tmp, "bad.json"), "w") as f:
+            json.dump(bad, f)
+        try:
+            db.with_ball_loss_params(cfg, os.path.join(tmp, "bad.json"))
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("a params file with an extra key must fail")
     print("test_degrade_ball: all checks passed")
 
 

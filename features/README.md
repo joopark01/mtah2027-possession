@@ -44,8 +44,8 @@ Every value in `config.json` has an entry in its `_provenance` block with `basis
 | `published` | stated in the challenge docs or a standard reference | fps, kickoff frames, walking speed, team map |
 | `law_of_game` | follows from the IFAB Laws of the Game | kickoff window and separation, still-ball speed, near-ball radii |
 | `physics` | follows from physics or human limits | turn-angle min speed, max plausible player speed |
-| `a_priori` | design choice made before seeing any labels | ball gap limit, velocity window, still-ball window |
-| `tuned_external` | tuned on an external dataset, named in `tuned_on` | none yet |
+| `a_priori` | design choice made before seeing any labels | ball gap limit, velocity window, still-ball window, all `ball_loss_*` (IDSSE ball-loss simulation) |
+| `tuned_external` | tuned on an external dataset, named in `tuned_on` | none active (the unused fitted ball-loss variant is in `features/external/ball_loss_fitted_bar_ath.json`) |
 
 **Rules for changing a value:**
 - **Tuning a value:** set `basis` to `tuned_external` and name the external dataset in `tuned_on`. The check rejects anything naming the provided game (`BAR-ATH`), because the organisers' 2026-11-03 rules forbid tuning on its ground truth or video.
@@ -64,6 +64,8 @@ The full block is copied into the provenance JSON written next to each output. U
 
 This step only adapts the data. It does no degradation and no tuning.
 
+`features/external/degrade_ball.py --all --seeds 0 1 2` simulates BAR-ATH-style ball loss on top of it and writes `external_data/idsse_degraded/<id>_s<seed>.parquet`. It uses the a priori `ball_loss_*` values from `config.json`. `--ball-loss-params features/external/ball_loss_fitted_bar_ath.json` swaps in the unused variant fitted to BAR-ATH label-free aggregates, which needs `tune_log.json`. See docs/findings.md.
+
 ## Tests (no real data needed)
 
 ```bash
@@ -71,6 +73,7 @@ python features/tests/make_synthetic_match.py /tmp/synth
 MTAH_DATA_DIR=/tmp/synth python features/tests/test_synthetic.py
 python features/tests/test_fetch_checks.py      # IDSSE fetch checks
 python features/tests/test_idsse_features.py    # IDSSE feature adapter
+python features/tests/test_degrade_ball.py      # IDSSE ball-loss simulation
 ```
 
 This builds a full-length fake match with scripted events and checks the extracted features against the known answers. The events cover:
