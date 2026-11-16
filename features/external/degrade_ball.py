@@ -13,8 +13,10 @@ CC BY 4.0. EXTERNAL data only; the provided BAR-ATH match never goes through thi
 IDSSE ball tracking is clean. BAR-ATH loses the ball in long blocks, mostly while it is dead, and
 picks it up again at the restart (docs/findings.md). The model, per period, in this RNG order:
   1. each DFL dead span [s, e) maps to the gap [s + onset_lag, e + reacquisition_lag), clipped
-     to the period. A gap of >= LONG_MIN_FRAMES is dropped with ball_loss_dead_drop_prob, a
-     shorter non-empty one with ball_loss_short_gap_drop_prob (BAR-ATH has almost no 13-125
+     to the period. Each lag is either an int (the same for every span; no RNG draw) or [lo, hi]
+     (an integer drawn per span, uniform on [lo, hi] inclusive: onset lags for all spans of the
+     period, then reacquisition lags, then the drop draws). A gap of >= LONG_MIN_FRAMES (after
+     the lags are drawn) is dropped with ball_loss_dead_drop_prob, a shorter non-empty one with ball_loss_short_gap_drop_prob (BAR-ATH has almost no 13-125
      frame runs: short stoppages lose the ball for > 5 s or not at all);
   2. live gaps: Poisson(rate * period hours) runs, log-uniform length in the frame range, placed
      uniformly inside live play with one free (alive, seen) frame on each side;
@@ -25,8 +27,9 @@ by --tune to BAR-ATH's label-free tracking aggregates (DATA.md, docs/findings.md
 kept, unused, in ball_loss_fitted_bar_ath.json and selected with --ball-loss-params, pending the
 organisers' confirmation that such fitting is allowed. TARGET below is the --tune objective and
 the comparison column of the printed tables; --tune and --sensitivity never write config.json.
-With these assumptions, BOTH edges of every D spell that loses the ball on degraded IDSSE are
-fixed by the simulator (onset lag and reacquisition lag), not observed.
+With fixed (int) lags, BOTH edges of every D spell that loses the ball on degraded IDSSE sit at
+a fixed offset from the DFL edges. The active config draws them per span from a priori uniform
+spreads instead, so a detector cannot recover them exactly; the spreads are still assumptions.
 
 Output external_data/idsse_degraded/<id>_s<seed>.parquet: the idsse_features columns (built by
 idsse_features.match_features with ball_override, so the same extractor code), the clean `label`,
@@ -103,14 +106,28 @@ def check_params(p):
     for k in ("ball_loss_dead_drop_prob", "ball_loss_short_gap_drop_prob"):
         if not 0.0 <= p[k] <= 1.0:
             raise ValueError("{} = {} not in [0, 1]".format(k, p[k]))
-    for k in ("ball_loss_onset_lag_frames", "ball_loss_reacquisition_lag_frames",
-              "ball_loss_live_gaps_per_hour", "ball_loss_flickers_per_hour"):
+    for k in ("ball_loss_onset_lag_frames", "ball_loss_reacquisition_lag_frames"):
+        v = p[k]
+        ok = (isinstance(v, int) and v >= 0) if not isinstance(v, list) else (
+            len(v) == 2 and all(isinstance(x, int) for x in v) and 0 <= v[0] <= v[1])
+        if isinstance(v, bool) or not ok:
+            raise ValueError("{} = {!r}: needs an int >= 0 or [lo, hi] with 0 <= lo <= hi".format(
+                k, v))
+    for k in ("ball_loss_live_gaps_per_hour", "ball_loss_flickers_per_hour"):
         if p[k] < 0:
             raise ValueError("{} = {} < 0".format(k, p[k]))
     for k in ("ball_loss_live_gap_frames_range", "ball_loss_flicker_frames_range"):
         lo, hi = p[k]
         if not 1 <= lo <= hi:
             raise ValueError("{} = {} needs 1 <= lo <= hi".format(k, p[k]))
+
+
+def span_lags(spec, n_spans, rng):
+    """Lag per dead span: an int is used as is (no RNG draw, so int configs keep their old
+    stream); [lo, hi] draws n_spans integers uniform on [lo, hi] inclusive."""
+    if isinstance(spec, list):
+        return rng.integers(spec[0], spec[1] + 1, n_spans)
+    return spec
 
 
 def drop_mask(alive, period, params, fps, rng):
@@ -124,8 +141,11 @@ def drop_mask(alive, period, params, fps, rng):
     for a, b in ef.block_spans(period):
         al, m = alive[a:b], mask[a:b]  # m is a view: writes go to mask
         starts, stops = true_runs(~al)
-        g0 = starts + p["ball_loss_onset_lag_frames"]
-        g1 = np.minimum(b - a, stops + p["ball_loss_reacquisition_lag_frames"])
+        g0 = starts + span_lags(p["ball_loss_onset_lag_frames"], len(starts), rng)
+        g1 = np.minimum(b - a, stops + span_lags(p["ball_loss_reacquisition_lag_frames"],
+                                                 len(starts), rng))
+        # each gap lies in [dead start, min(period end, restart + reacq)); long/short is decided
+        # on the gap after the lags are drawn
         prob = np.where(g1 - g0 >= LONG_MIN_FRAMES, p["ball_loss_dead_drop_prob"],
                         np.where(g1 > g0, p["ball_loss_short_gap_drop_prob"], 0.0))
         keep = rng.random(len(starts)) < prob

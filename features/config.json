@@ -23,8 +23,8 @@
 
   "ball_loss_dead_drop_prob": 1.0,
   "ball_loss_short_gap_drop_prob": 0.5,
-  "ball_loss_onset_lag_frames": 50,
-  "ball_loss_reacquisition_lag_frames": 0,
+  "ball_loss_onset_lag_frames": [0, 100],
+  "ball_loss_reacquisition_lag_frames": [0, 25],
   "ball_loss_live_gaps_per_hour": 30,
   "ball_loss_live_gap_frames_range": [126, 500],
   "ball_loss_flickers_per_hour": 10,
@@ -148,13 +148,13 @@
     "ball_loss_onset_lag_frames": {
       "basis": "a_priori",
       "source": "user/main-session decision 2026-11-15 (docs/findings.md, ball-loss section)",
-      "reason": "Ball-loss simulation on IDSSE only (features/external/degrade_ball.py). A dropped dead span starts this many frames after DFL marks the ball dead: 50 (2 s). The tracker keeps following the ball for a moment after it goes dead (rolling out, being collected); a round guess. Chosen without fitting; but the authors had already seen BAR-ATH's label-free tracking aggregates (docs/findings.md) and the earlier BAR-ATH-fitted values (features/external/ball_loss_fitted_bar_ath.json), so the choice is not blind. Fixed 2026-11-15 before rebuilding the degraded tables and not revised after seeing them.",
+      "reason": "Ball-loss simulation on IDSSE only (features/external/degrade_ball.py). A dropped dead span starts this many frames after DFL marks the ball dead, drawn per span uniform on [0, 100] inclusive (0-4 s) from the per-(match, seed) RNG. The tracker keeps following the ball for a moment after it goes dead (rolling out, being collected). User's a priori choice (2026-11-15, replacing the fixed 50), made to stop the simulator fixing dead-ball edges exactly: with a fixed lag the ball vanished exactly 50 frames after every DFL dead onset. Not fitted to anything. The spread was fixed before the degraded tables were rebuilt and not revised after seeing them. Even a span dropped with probability 1.0 now has random edges. The spread itself is an assumption; the authors had already seen BAR-ATH's label-free tracking aggregates (docs/findings.md) and the earlier fitted values, so it is not blind. Timing: decided after the fixed-lag tune and held-out harness runs, motivated by the fixed-edge leak the reviewer found in the simulator's structure, not by any score.",
       "tuned_on": null
     },
     "ball_loss_reacquisition_lag_frames": {
       "basis": "a_priori",
       "source": "user/main-session decision 2026-11-15 (docs/findings.md, ball-loss section)",
-      "reason": "Ball-loss simulation on IDSSE only (features/external/degrade_ball.py). A dropped dead span ends at the restart (first DFL alive row) plus this lag: 0. Not identifiable from any data we may use; the reappearance is taken to be the restart. Flagged as a risk: both edges of a simulated loss are fixed by the simulator, not observed. Chosen without fitting; but the authors had already seen BAR-ATH's label-free tracking aggregates (docs/findings.md) and the earlier BAR-ATH-fitted values (features/external/ball_loss_fitted_bar_ath.json), so the choice is not blind. Fixed 2026-11-15 before rebuilding the degraded tables and not revised after seeing them.",
+      "reason": "Ball-loss simulation on IDSSE only (features/external/degrade_ball.py). A dropped dead span ends at the restart (first DFL alive row) plus this lag, drawn per span uniform on [0, 25] inclusive (0-1 s) from the per-(match, seed) RNG, and clipped to the period end. Not identifiable from any data we may use (docs/findings.md sensitivity). User's a priori choice (2026-11-15, replacing the fixed 0), made to stop the simulator fixing dead-ball edges exactly: with lag 0 the ball reappeared on exactly the DFL restart frame. Not fitted to anything. The spread was fixed before the degraded tables were rebuilt and not revised after seeing them. Even a span dropped with probability 1.0 now has random edges. The spread itself is an assumption; the authors had already seen BAR-ATH's label-free tracking aggregates (docs/findings.md) and the earlier fitted values, so it is not blind. Timing: decided after the fixed-lag tune and held-out harness runs, motivated by the fixed-edge leak the reviewer found in the simulator's structure, not by any score.",
       "tuned_on": null
     },
     "ball_loss_live_gaps_per_hour": {

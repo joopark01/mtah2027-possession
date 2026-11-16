@@ -20,10 +20,11 @@ external_data/harness/holdout_log.json.
 Predictors get the table with LEAK_COLUMNS dropped: `label` (the answer) and `ball_dropped` (dropped
 for hygiene; it equals ~ball_seen, which is the intended observable).
 
-KNOWN LEAK in degraded tables: with the a priori ball-loss config (drop prob 1.0, onset lag 50,
-reacquisition lag 0) the ball vanishes exactly 50 frames after every long DFL dead onset and
-reappears on exactly the DFL restart frame. Do NOT tune D-edge offsets on degraded tables: they
-would just recover 50 and 0. Degraded alive/dead scores are an optimistic bound for BAR-ATH.
+Dead-ball edges in degraded tables: the ball-loss onset and reacquisition lags are drawn per dead
+span from a priori uniform spreads (0-4 s and 0-1 s; degrade_ball.py), so the ball no longer
+vanishes/reappears at a fixed offset from the DFL edges. A detector's ball vanish/reappear offsets
+stay a_priori and are never tuned on degraded tables. Residual risk: the spreads are themselves
+assumptions, so degraded alive/dead scores are only as realistic as they are.
 """
 
 import argparse

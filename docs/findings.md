@@ -47,7 +47,7 @@ Re-run on 2026-11-15; the numbers above reproduced exactly.
 - The period seam joins rows a halftime apart. Ball kinematics, stillness and jump counts are now masked at every block edge (in the shared extractor). Anything temporal on IDSSE must split on `half`.
 
 ## 2026-11-15: ball-loss simulation (`features/external/degrade_ball.py`)
-Imitates BAR-ATH's tracker on clean IDSSE ball tracking. Each DFL dead span maps to the gap [dead start + onset lag, restart + reacquisition lag). If that gap is at least 126 frames, it is dropped with probability p; a shorter one is dropped with a lower probability p_short. On top come Poisson live-play gaps (log-uniform length) and 1–12-frame flickers. Each (match, seed) gets its own RNG, `default_rng([seed, match_index])`.
+Imitates BAR-ATH's tracker on clean IDSSE ball tracking. Each DFL dead span maps to the gap [dead start + onset lag, restart + reacquisition lag), clipped to its period. Each lag is either a fixed int or, in the active config, an integer drawn per dead span uniform on [lo, hi]. If that gap is at least 126 frames, it is dropped with probability p; a shorter one is dropped with a lower probability p_short. On top come Poisson live-play gaps (log-uniform length) and 1–12-frame flickers. Each (match, seed) gets its own RNG, `default_rng([seed, match_index])`.
 
 **Active simulator: a priori (decided 2026-11-15).** The user decided that the simulator must no longer be fitted to BAR-ATH aggregates. All 8 `ball_loss_*` values in `features/config.json` are now `a_priori`, with `tuned_on` null:
 
@@ -55,28 +55,41 @@ Imitates BAR-ATH's tracker on clean IDSSE ball tracking. Each DFL dead span maps
 |---|---|---|
 | `dead_drop_prob` | 1.0 | User's decision: a tactical-camera tracker loses the ball whenever it is dead for ≥ 5 s (held, off the pitch, out of shot). |
 | `short_gap_drop_prob` | 0.5 | No prior knowledge whether a brief stoppage (< 5 s) loses the ball, so the maximum-ignorance value. |
-| `onset_lag_frames` | 50 (2 s) | The tracker keeps following the ball for a moment after DFL marks it dead (rolling out, being collected). A round guess. |
-| `reacquisition_lag_frames` | 0 | Not identifiable; reappearance is taken to be the restart. Unchanged. |
+| `onset_lag_frames` | per span uniform on [0, 100] (0–4 s) | The tracker keeps following the ball for a moment after DFL marks it dead (rolling out, being collected). Was a fixed 50; changed 2026-11-15 (user's a priori choice) so the simulator no longer fixes the dead-ball edge exactly. |
+| `reacquisition_lag_frames` | per span uniform on [0, 25] (0–1 s), clipped to the period end | Not identifiable from aggregates (sensitivity below). Was a fixed 0; changed for the same reason. |
 | `live_gaps_per_hour`, `live_gap_frames_range` | 30, [126, 500] (5–20 s) | Occlusion in crowds and on aerial balls. Nonzero on purpose, so that "ball missing" on degraded IDSSE is not a proxy for "dead" and a detector has to use player cues. A round guess. |
 | `flickers_per_hour`, `flicker_frames_range` | 10, [1, 12] | Brief detector dropouts. A round guess. |
 
 These values were chosen without fitting, but they are **not blind**: the authors had already seen BAR-ATH's tracking aggregates (above) and the earlier fitted values. They were fixed before the tables were rebuilt and were not revised afterwards. A build with only a priori keys does not need `tune_log.json`. Each output's provenance records `"ball_loss_variant": "a_priori"` (or the `--ball-loss-params` file path) and the full `degrade_params`.
 
-Rebuilt with `--all --seeds 0 1 2` (21 tables). Same layout as the fitted table below. The table is **descriptive only**: BAR-ATH is shown for comparison, nothing was changed in response, and the held-out numbers are reported separately.
+The lag spreads were fixed before the rebuild and not revised after. Even a span dropped with probability 1.0 now has random edges.
+
+Rebuilt 2026-11-15 with `--all --seeds 0 1 2` (21 tables), randomised lags. Same layout as the fitted table below. The table is **descriptive only**: BAR-ATH is shown for comparison, nothing was changed in response, and the held-out numbers are reported separately.
 
 | | BAR-ATH (comparison only) | tuning (5 × 3) | held out (2 × 3, evaluation only) |
 |---|---|---|---|
-| ball seen | 59.3% | 48.6% (43–55% per run) | 52.4% |
-| runs ≥ 5 s | 132 | 157.9 | 138.2 |
-| share of missing frames in runs ≥ 5 s | 99.7% | 99.4% | 99.2% |
-| runs of 1–12 frames | ~16 | 18.0 | 21.1 |
-| runs of 13–125 frames | ~2 | 6.0 | 7.2 |
-| long-gap median | 11.6 s | 14.7 s | 15.4 s |
-| longest | 221.5 s | 134 s | 186 s |
-| bins 5-10 / 10-20 / 20-40 / 40-80 / 80-160 / 160+ s | 53 / 35 / 31 / 11 / 1 / 1 | 46.2 / 61.1 / 33.6 / 14.1 / 2.7 / 0.2 | 41.6 / 49.0 / 32.5 / 12.5 / 1.6 / 1.1 |
-| ball still 1 s after a long gap ends | 2% | 2.4% | 2.1% |
+| ball seen | 59.3% | 48.1% (39–55% per run) | 50.3% |
+| runs ≥ 5 s | 132 | 157.7 | 146.0 |
+| share of missing frames in runs ≥ 5 s | 99.7% | 99.4% | 99.4% |
+| runs of 1–12 frames | ~16 | 16.8 | 16.8 |
+| runs of 13–125 frames | ~2 | 5.6 | 4.9 |
+| long-gap median | 11.6 s | 15.1 s | 15.4 s |
+| longest | 221.5 s | 136 s | 187 s |
+| bins 5-10 / 10-20 / 20-40 / 40-80 / 80-160 / 160+ s | 53 / 35 / 31 / 11 / 1 / 1 | 46.5 / 59.8 / 34.4 / 14.3 / 2.5 / 0.2 | 43.0 / 53.1 / 33.8 / 13.4 / 1.6 / 1.1 |
+| ball still 1 s after a long gap ends | 2% | 1.8% | 2.1% |
 
-On degraded IDSSE, both edges of every D spell that loses the ball are still fixed by simulator assumptions: the start by the a-priori onset lag of 2 s, the end by the reacquisition lag of 0. Boundary-placement results on degraded IDSSE inherit both.
+(The fixed-lag a priori build it replaces, onset 50 and reacquisition 0: tuning seen 48.6%, 157.9 long runs, median 14.7 s; held out 52.4%, 138.2, 15.4 s.)
+
+**Edge check (tuning matches only, 5 × 3; descriptive, nothing changed in response).** Over the long (≥ 126-frame) dropped runs that overlap DFL dead spans: vanish offset = run start − first overlapping DFL dead onset; reappear offset = run stop − DFL restart of the last overlapped dead span the run has passed (runs ending at the period end excluded).
+
+| | n | min | q25 | median | q75 | max | distinct values |
+|---|---|---|---|---|---|---|---|
+| ball vanish − DFL dead onset (frames) | 1376 | 0 | 26 | 50 | 76 | 100 | 101 |
+| ball reappear − DFL restart (frames) | 1365 | 0 | 6 | 12 | 19 | 25 | 26 |
+
+Both match their uniform spreads. Of 2,113 long runs, 737 are live-play gaps (no dead overlap). 7 span more than one dead span, and 6 end inside a later dead span that was not dropped (the reacquisition lag reached past a live interval shorter than itself).
+
+On degraded IDSSE the edges of a ball-loss D spell are no longer at a fixed offset from DFL's, but their spreads (0–4 s onset, 0–1 s reacquisition) are themselves assumptions. A detector's ball vanish/reappear offsets stay `a_priori` and are never tuned on degraded tables.
 
 ### Fitted variant (unused, pending organisers' confirmation)
 These are the earlier values, fitted to BAR-ATH's **label-free tracking aggregates** (above and DATA.md, never GT). They are kept with their full provenance (`tuned_external`, `tuned_on`, `target`, and the tune-log reference) in `features/external/ball_loss_fitted_bar_ath.json`. `external_data/idsse_degraded/tune_log.json` stays as their audit trail. To switch back, if the organisers confirm this is allowed:
@@ -116,7 +129,7 @@ Seeds 0–2, built 2026-11-15 before the switch. Counts are scaled to BAR-ATH's 
 | 25 | 100 | 57.8% | 131.3 | 1.9 | 13.4 | 54/33/29/12/2/0 | 1.8% |
 | 25 | 150 | 61.2% | 123.0 | 3.4 | 12.9 | 53/30/26/12/2/0 | 2.1% |
 
-The onset lag mostly moves the seen share (about 3.5 pp per 2 s). The reacquisition lag moves almost nothing: 1 s of lag costs about 1.7 pp of seen share and leaves the "still after" share flat. **The aggregates cannot identify the reacquisition lag.** On degraded IDSSE, both edges of every D spell that loses the ball are therefore fixed by simulator assumptions: the start by the tuned onset lag, the end by the a-priori reacquisition lag of 0. Boundary-placement results on degraded IDSSE inherit both.
+The onset lag mostly moves the seen share (about 3.5 pp per 2 s). The reacquisition lag moves almost nothing: 1 s of lag costs about 1.7 pp of seen share and leaves the "still after" share flat. **The aggregates cannot identify the reacquisition lag.** With this variant's fixed lags, both edges of every D spell that loses the ball on degraded IDSSE are fixed by simulator assumptions: the start by the tuned onset lag, the end by the a-priori reacquisition lag of 0. Boundary-placement results on degraded IDSSE inherit both.
 
 **What still didn't fit:**
 - Too few very long gaps (160 s+: 0.2 vs 1), and the median runs high (13.1 vs 11.6 s).
@@ -127,16 +140,16 @@ The onset lag mostly moves the seen share (about 3.5 pp per 2 s). The reacquisit
 
 ## 2026-11-15: tuning harness and trivial baseline (`features/external/harness.py`)
 
-Scoring is `evaluation/possession_metrics.py` (`pm.evaluate`). 26 X rows (one more than the widest transition tolerance) are inserted at the period seam in GT and prediction, so no spell or transition match crosses halftime. GT is the DFL proxy label. The predictor never sees `label` or `ball_dropped`. Degraded tables use the a priori ball-loss variant, 3 seeds each. Clean tables get one run per match. `baseline_nearest`: when the ball position is known, predict the nearest player's team; otherwise D.
+Scoring is `evaluation/possession_metrics.py` (`pm.evaluate`). 26 X rows (one more than the widest transition tolerance) are inserted at the period seam in GT and prediction, so no spell or transition match crosses halftime. GT is the DFL proxy label. The predictor never sees `label` or `ball_dropped`. Degraded tables use the a priori ball-loss variant, 3 seeds each; the tune table below was re-run on the randomised-lag tables (2026-11-15). Clean tables get one run per match. `baseline_nearest`: when the ball position is known, predict the nearest player's team; otherwise D.
 
 **Tune split (J03WMX, J03WN1, J03WOH, J03WOY, J03WQQ), mean (min–max) over runs:**
 
 | tables | runs | spell_f1_mean | spell_f1@0.5 | macro_f1 | alive_dead_f1 | team_acc_gt_alive | n_gt_spells | n_pred_spells | fragmentation |
 |---|---|---|---|---|---|---|---|---|---|
-| degraded | 15 | 0.106 (0.09–0.13) | 0.092 (0.08–0.11) | 0.724 (0.70–0.75) | 0.868 (0.84–0.90) | 0.624 (0.59–0.67) | 454 (401–511) | 1817 (1634–1980) | 3.54 (3.03–4.23) |
+| degraded | 15 | 0.106 (0.08–0.13) | 0.092 (0.07–0.11) | 0.720 (0.69–0.75) | 0.861 (0.81–0.90) | 0.617 (0.55–0.67) | 454 (401–511) | 1765 (1529–1994) | 3.45 (2.78–4.25) |
 | clean | 5 | 0.100 (0.08–0.12) | 0.086 (0.07–0.10) | 0.359 (0.33–0.38) | 0.704 (0.65–0.74) | 0.764 (0.75–0.78) | 454 (401–511) | 2092 (1981–2240) | 3.77 (3.32–4.43) |
 
-**HELD OUT (J03WPY, J03WR9). Evaluation only: nothing was tuned or selected on these numbers.** Both looks are logged in `external_data/harness/holdout_log.json`.
+**HELD OUT (J03WPY, J03WR9). Evaluation only: nothing was tuned or selected on these numbers.** Both looks are logged in `external_data/harness/holdout_log.json`. The degraded row was made on the earlier **fixed-lag** tables (onset 50, reacquisition 0) and was not re-run on the randomised-lag tables.
 
 | tables | runs | spell_f1_mean | spell_f1@0.5 | macro_f1 | alive_dead_f1 | team_acc_gt_alive | n_gt_spells | n_pred_spells | fragmentation |
 |---|---|---|---|---|---|---|---|---|---|
@@ -144,7 +157,7 @@ Scoring is `evaluation/possession_metrics.py` (`pm.evaluate`). 26 X rows (one mo
 | clean | 2 | 0.095 (0.09–0.10) | 0.083 (0.08–0.09) | 0.376 (0.37–0.39) | 0.725 (0.72–0.74) | 0.797 (0.79–0.81) | 396 (370–421) | 1991 (1864–2117) | 4.06 (4.03–4.09) |
 
 **Failure modes, read from the aggregates:**
-- **Fragmentation is the main failure.** The baseline predicts 4.0x (degraded) to 4.6x (clean) as many spells as the GT (n_pred_spells / n_gt_spells). Nearest-player identity flips during contests and passes, so spell_f1 stays near 0.1 even where the frame metrics look fine.
-- **The degraded tables score better than the clean ones on frames.** On clean tables the ball is always known, so the baseline never predicts D. That gives macro_f1 0.36 and alive_dead_f1 0.70, and the gap is all false alive during dead spans. On degraded tables a missing ball mostly means a dead span, so "missing → D" gets alive/dead right much of the time (alive_dead_f1 0.87). That is a property of the simulator, which hides the ball mostly in dead spans, and it says nothing about competence. With reacquisition lag 0 the restart edge is exact in the simulator, so degraded alive/dead scores are an optimistic bound for BAR-ATH, and D-edge offsets must not be tuned on degraded tables (they would recover the simulator's 50 and 0).
+- **Fragmentation is the main failure.** The baseline predicts 3.9x (degraded, tune) to 4.6x (clean) as many spells as the GT (n_pred_spells / n_gt_spells). Nearest-player identity flips during contests and passes, so spell_f1 stays near 0.1 even where the frame metrics look fine.
+- **The degraded tables score better than the clean ones on frames.** On clean tables the ball is always known, so the baseline never predicts D. That gives macro_f1 0.36 and alive_dead_f1 0.70, and the gap is all false alive during dead spans. On degraded tables a missing ball mostly means a dead span, so "missing → D" gets alive/dead right much of the time (alive_dead_f1 0.86). That is a property of the simulator, which hides the ball mostly in dead spans, and it says nothing about competence. The ball-loss edges are now randomised a priori per dead span (onset 0–4 s, reacquisition 0–1 s), so they no longer sit at a fixed offset from the DFL edges. A detector's ball vanish/reappear offsets stay `a_priori` and are never tuned on degraded tables. Residual risk: the spreads are themselves assumptions, so degraded alive/dead scores remain only as realistic as those spreads.
 - **Degraded vs clean spell_f1 (0.106 vs 0.100) is within noise** (SPELL_NOISE_BAND 0.04).
 - **The team call is the second error.** Team accuracy is 0.76 on clean tables, where the baseline predicts alive almost everywhere. On degraded tables it drops to 0.62, because alive frames with a hidden ball are predicted D and the strict metric counts them as wrong.

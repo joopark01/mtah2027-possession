@@ -64,6 +64,47 @@ def main():
             pass
         else:
             raise AssertionError("bad parameter accepted: {}".format(bad))
+    for bad_lag in ([5, 2], [-1, 3], [0, 1, 2], 2.5, [0.0, 3], True):
+        try:
+            db.check_params(dict(params(1.0, bad_lag, 0, 0.0, 0.0)))
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("bad lag accepted: {!r}".format(bad_lag))
+    db.check_params(params(1.0, [0, 0], [3, 3], 0.0, 0.0))
+
+    # lag ranges: drawn per span; offsets within [lo, hi]; more than one distinct value; each gap
+    # stays inside its period and [dead start, restart + reacq); seeded
+    n_sp, span, step = 200, 300, 600  # 200 dead spans of 300 frames, 300 alive frames between
+    alive = np.ones(n_sp * step, dtype=np.int8)
+    for i in range(n_sp):
+        alive[i * step:i * step + span] = 0
+    period = np.repeat([1, 2], n_sp * step // 2).astype(np.int8)
+    pr = params(1.0, [0, 100], [0, 25], 0.0, 0.0)
+    m = db.drop_mask(alive, period, pr, FPS, np.random.default_rng(11))
+    st, sp = db.true_runs(m)
+    assert len(st) == n_sp, len(st)  # one gap per dead span, none merged
+    on, re = st - np.arange(n_sp) * step, sp - (np.arange(n_sp) * step + span)
+    assert on.min() >= 0 and on.max() <= 100 and re.min() >= 0 and re.max() <= 25, (on, re)
+    assert len(set(on)) > 1 and len(set(re)) > 1
+    assert (m == db.drop_mask(alive, period, pr, FPS, np.random.default_rng(11))).all()
+    assert (m != db.drop_mask(alive, period, pr, FPS, np.random.default_rng(12))).any()
+    # reacquisition never runs past the period end; gap classified after the draw: a 130-frame
+    # dead span at the end of period 1 with onset in [0, 10] stays long (>= 126) and is dropped
+    # with p_short = 0 only when the drawn onset keeps it >= 126 frames
+    al = np.ones(400, dtype=np.int8)
+    al[70:200] = 0
+    al[300:330] = 0  # 30-frame span: short whatever the lags, p_short = 0 -> never dropped
+    per = np.repeat([1, 2], 200).astype(np.int8)
+    for seed in range(40):
+        rng_lags = np.random.default_rng(seed)
+        g = db.drop_mask(al, per, params(1.0, [0, 10], [0, 25], 0.0, 0.0, p_short=0.0), FPS,
+                         np.random.default_rng(seed))
+        onset = rng_lags.integers(0, 11, 1)[0]  # first draw of period 1: its one span's onset
+        assert not g[200:].any() and not g[:70].any()
+        assert g[70 + onset:200].all() == (200 - 70 - onset >= db.LONG_MIN_FRAMES)
+        assert g[70:200].sum() in (0, 200 - 70 - onset)
+
     # still_after_reappear: within the period only, NaN-aware
     msk = np.zeros(400, dtype=bool)
     msk[10:150] = True    # ends at 150, row 162 checked
@@ -116,7 +157,7 @@ def main():
     db.load = fake_load
     try:
         with open(os.path.join(HERE, "..", "config.json")) as f:
-            cfg0 = json.load(f)
+            cfg0 = dict(json.load(f), ball_loss_live_gaps_per_hour=0.0)  # fits the tiny match
         with tempfile.TemporaryDirectory() as tmp:
             log = os.path.join(tmp, "tune_log.json")
             grid = {"ball_loss_dead_drop_prob": [0.5, 1.0]}
@@ -128,7 +169,7 @@ def main():
     assert seen_ids == list(db.ef.IDSSE_TUNE), seen_ids
     assert not set(seen_ids) & set(db.ef.IDSSE_HOLDOUT)
     assert len(rows) == 2 and len(logged["results"]) == 2 and logged["timestamp"]
-    assert logged["tuned_on"] == list(db.ef.IDSSE_TUNE)
+    assert logged["tuned_on"] == list(db.ef.IDSSE_TUNE) and logged["infeasible"] == 0
 
     # ball_override goes through the shared extractor: ball_seen == ~mask, labels unchanged
     with open(os.path.join(HERE, "..", "config.json")) as f:
