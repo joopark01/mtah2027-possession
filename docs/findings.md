@@ -246,7 +246,7 @@ These are in-sample numbers: the degraded tuned row is the tuning objective itse
 - alive_dead_f1 matches in-sample (0.949 degraded): the alive/dead split transfers across matches.
 - spell_f1 sits inside the flat tuning band (0.111–0.122), so it says nothing either way about overfitting.
 
-**Second look: D-segment counts** (`features/external/dead_segment_counts.py`). Logged as predictor `dead_ball_v1_dsegment_counts` (2026-11-16T03:06:59). Nothing was changed in response to it. After this look the held-out pair is **no longer clean for judging any v2 change motivated by these counts**; a later held-out number would be reported as a further look.
+**Second look: D-segment counts** (`features/external/dead_segment_counts.py`). Logged by hand as predictor `dead_ball_v1_dsegment_counts` (2026-11-16T03:06:59). The entry's `script_sha256` is harness.py's, not this script's, and its summary values are rounded. The script has since been restricted to the tuning matches, so it cannot repeat the held-out look. Nothing was changed in response to it. After this look the held-out pair is **no longer clean for judging any v2 change motivated by these counts**; a later held-out number would be reported as a further look.
 
 | split | tables | pred D segs | true D segs | pred < 1 s | pred D share | true D share |
 |---|---|---|---|---|---|---|

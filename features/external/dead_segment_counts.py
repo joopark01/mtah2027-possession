@@ -1,4 +1,8 @@
-"""Aggregate D-segment counts for the tuned detector vs DFL D runs (external data only)."""
+"""Aggregate D-segment counts for the tuned detector vs DFL D runs (external data only).
+
+Tuning matches only. The one held-out run (2026-11-16) was made with an earlier version of this
+script that also looped over IDSSE_HOLDOUT; per the held-out policy in CLAUDE.md that loop is gone.
+"""
 import json, sys
 import numpy as np
 sys.path[:0] = ["features", "features/external"]
@@ -10,7 +14,7 @@ def druns(d, half):
         x = np.r_[0, d[a:b].astype(np.int8), 0]; e = np.diff(x)
         L = np.flatnonzero(e == -1) - np.flatnonzero(e == 1); lens += list(L)
     return np.array(lens)
-for split, ids in (("tune", ef.IDSSE_TUNE), ("holdout", ef.IDSSE_HOLDOUT)):
+for split, ids in (("tune", ef.IDSSE_TUNE),):
     for tables, seeds in (("degraded", (0, 1, 2)), ("clean", (None,))):
         r = []
         for m in ids:

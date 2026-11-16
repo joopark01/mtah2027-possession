@@ -7,6 +7,7 @@ Fork of the organisers' repo (`upstream` = metrica-sports/more-than-a-hack-2027,
 - **No training, fitting or tuning on the ground truth or the video.** Every parameter is published, follows from the Laws of the Game or physics, is chosen a priori, or is tuned on **external** data only (IDSSE). `features/config.json` `_provenance` records which, and `check_provenance()` enforces it.
 - No hand labels on BAR-ATH, and no checking our output against the video.
 - **IDSSE split (fixed 2026-11-09, before any results):** tune on J03WMX, J03WN1, J03WOH, J03WOY, J03WQQ. Hold out J03WPY, J03WR9: evaluate on them only, never tune or select on them.
+- **Held-out policy (user decision, 2026-11-16):** no more per-component held-out looks. There will be one final held-out evaluation of the full integrated pipeline, logged, and nothing is changed after it. The dead-ball detector v1 has already had two looks (`docs/findings.md`).
 - **Exception:** external data lives in `external_data/` (gitignored, outside `data/` on purpose) and may be read normally. Never put external data under `data/`.
 
 ## Where things are
