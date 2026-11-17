@@ -396,3 +396,7 @@ The single final held-out evaluation of the full pipeline: `harness.py --predict
 - spell_f1_mean 0.417 (min–max over the 6 runs 0.399–0.434); in-sample run 3 was 0.418.
 - spellF1 @ 0.5 0.424, macro_f1 0.851, alive_dead_f1 0.950, team accuracy on GT-alive frames 0.824.
 - Predicted spells 279 per match against 396 true (under-segmenting, as in-sample).
+
+## Clean-clone test at the final commit (2026-11-17)
+
+Fresh clone of 8e8c215, raw data copied in without `data/derived/`, `sh reproduce.sh`: exit 0 in 39 s, submission valid, sha256 17511abfaffd9e4f57404f20d24c19b7b1145633b8c050ed052213fdcff52053, byte-identical to the main copy and to the 60b2645 test. Clone left clean. Commits after 8e8c215 change documentation only.

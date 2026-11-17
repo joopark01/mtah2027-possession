@@ -88,7 +88,7 @@ BAR-ATH label-free aggregates: the coordinate conventions agree (coarse match sh
 
 ### 6.3 Reproducibility
 
-`sh reproduce.sh` in a fresh clone with the raw data unpacked into `data/` rebuilt the submission byte for byte (tested at commits 80a2541 and 60b2645; Appendix C).
+`sh reproduce.sh` in a fresh clone with the raw data unpacked into `data/` rebuilt the submission byte for byte (tested at commits 80a2541, 60b2645 and 8e8c215, the final pipeline commit; later commits change only docs; sha256 17511abf…; Appendix C).
 
 ### 6.4 Final held-out evaluation
 
