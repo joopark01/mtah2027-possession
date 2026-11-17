@@ -1,0 +1,333 @@
+[
+  {
+    "timestamp": "2026-11-15T20:40:30",
+    "predictor": "baseline_nearest",
+    "script_sha256": "144b8966024ed163e10a440dab270b32893b92575d4f999e4f7fe4f197af9413",
+    "config_sha256": "2a657654c0b2e900b58d3348a839027f2c42db21a045c9af3eea69f8b94ec123",
+    "tables": "degraded",
+    "seeds": [
+      0,
+      1,
+      2
+    ],
+    "matches": [
+      "J03WPY",
+      "J03WR9"
+    ],
+    "summary": {
+      "spell_f1_mean": {
+        "mean": 0.10292703184245161,
+        "min": 0.09865626354573039,
+        "max": 0.1071531445031205
+      },
+      "spell_f1_at_headline": {
+        "mean": 0.0897898486907134,
+        "min": 0.08842652795838753,
+        "max": 0.09313490158425348
+      },
+      "macro_f1": {
+        "mean": 0.7569835835796171,
+        "min": 0.7442148483368359,
+        "max": 0.7746990629264482
+      },
+      "alive_dead_f1": {
+        "mean": 0.8958766819840905,
+        "min": 0.8893614568187495,
+        "max": 0.9074528776607678
+      },
+      "team_acc_gt_alive": {
+        "mean": 0.6811068216958551,
+        "min": 0.6625460348637368,
+        "max": 0.7049439729945145
+      },
+      "n_gt_spells": {
+        "mean": 395.5,
+        "min": 370.0,
+        "max": 421.0
+      },
+      "n_pred_spells": {
+        "mean": 1792.1666666666667,
+        "min": 1685.0,
+        "max": 1886.0
+      },
+      "fragmentation": {
+        "mean": 3.9339924339924344,
+        "min": 3.8687258687258685,
+        "max": 4.023809523809524
+      }
+    },
+    "source": "Bassek, Rein, Weber et al., Sci Data 12, 195 (2025), doi:10.1038/s41597-025-04505-y, CC BY 4.0"
+  },
+  {
+    "timestamp": "2026-11-15T20:40:30",
+    "predictor": "baseline_nearest",
+    "script_sha256": "144b8966024ed163e10a440dab270b32893b92575d4f999e4f7fe4f197af9413",
+    "config_sha256": "2a657654c0b2e900b58d3348a839027f2c42db21a045c9af3eea69f8b94ec123",
+    "tables": "clean",
+    "seeds": null,
+    "matches": [
+      "J03WPY",
+      "J03WR9"
+    ],
+    "summary": {
+      "spell_f1_mean": {
+        "mean": 0.09507299257199256,
+        "min": 0.08951930654058313,
+        "max": 0.10062667860340198
+      },
+      "spell_f1_at_headline": {
+        "mean": 0.08332222201057798,
+        "min": 0.07801418439716312,
+        "max": 0.08863025962399283
+      },
+      "macro_f1": {
+        "mean": 0.3763975738722375,
+        "min": 0.3662302438562761,
+        "max": 0.3865649038881988
+      },
+      "alive_dead_f1": {
+        "mean": 0.7253387626530428,
+        "min": 0.7155939930865152,
+        "max": 0.7350835322195705
+      },
+      "team_acc_gt_alive": {
+        "mean": 0.7969136673934094,
+        "min": 0.7863000245519274,
+        "max": 0.8075273102348914
+      },
+      "n_gt_spells": {
+        "mean": 395.5,
+        "min": 370.0,
+        "max": 421.0
+      },
+      "n_pred_spells": {
+        "mean": 1990.5,
+        "min": 1864.0,
+        "max": 2117.0
+      },
+      "fragmentation": {
+        "mean": 4.06075231075231,
+        "min": 4.034632034632034,
+        "max": 4.086872586872587
+      }
+    },
+    "source": "Bassek, Rein, Weber et al., Sci Data 12, 195 (2025), doi:10.1038/s41597-025-04505-y, CC BY 4.0"
+  },
+  {
+    "timestamp": "2026-11-16T03:06:19",
+    "predictor": "dead_ball_v1",
+    "script_sha256": "44cb9ca1e60684cb5427595b16abf4b476b3aec9c813ae33fe4c17463438325d",
+    "config_sha256": "086752c9892223577075b95356af44dd41fca28f50ede9b8768a7c7832c3fe27",
+    "tables": "degraded",
+    "seeds": [
+      0,
+      1,
+      2
+    ],
+    "matches": [
+      "J03WPY",
+      "J03WR9"
+    ],
+    "summary": {
+      "spell_f1_mean": {
+        "mean": 0.11504465968712203,
+        "min": 0.1092727272727273,
+        "max": 0.12359868111163448
+      },
+      "spell_f1_at_headline": {
+        "mean": 0.10395357282654867,
+        "min": 0.09727272727272727,
+        "max": 0.11022138483278379
+      },
+      "macro_f1": {
+        "mean": 0.7973009051492909,
+        "min": 0.7916611263020269,
+        "max": 0.8052538025854474
+      },
+      "alive_dead_f1": {
+        "mean": 0.950178789255096,
+        "min": 0.9466003745076516,
+        "max": 0.9525903164491624
+      },
+      "team_acc_gt_alive": {
+        "mean": 0.7461680622687862,
+        "min": 0.7379941075374417,
+        "max": 0.7576421773172676
+      },
+      "n_gt_spells": {
+        "mean": 395.5,
+        "min": 370.0,
+        "max": 421.0
+      },
+      "n_pred_spells": {
+        "mean": 1681.5,
+        "min": 1546.0,
+        "max": 1794.0
+      },
+      "fragmentation": {
+        "mean": 3.6934986934986935,
+        "min": 3.511583011583012,
+        "max": 3.893939393939394
+      }
+    },
+    "source": "Bassek, Rein, Weber et al., Sci Data 12, 195 (2025), doi:10.1038/s41597-025-04505-y, CC BY 4.0"
+  },
+  {
+    "timestamp": "2026-11-16T03:06:19",
+    "predictor": "dead_ball_v1",
+    "script_sha256": "44cb9ca1e60684cb5427595b16abf4b476b3aec9c813ae33fe4c17463438325d",
+    "config_sha256": "086752c9892223577075b95356af44dd41fca28f50ede9b8768a7c7832c3fe27",
+    "tables": "clean",
+    "seeds": null,
+    "matches": [
+      "J03WPY",
+      "J03WR9"
+    ],
+    "summary": {
+      "spell_f1_mean": {
+        "mean": 0.11339789413375717,
+        "min": 0.11173449229553536,
+        "max": 0.11506129597197898
+      },
+      "spell_f1_at_headline": {
+        "mean": 0.10232209914053476,
+        "min": 0.09956538917423942,
+        "max": 0.10507880910683011
+      },
+      "macro_f1": {
+        "mean": 0.8196725040085326,
+        "min": 0.8141386069861173,
+        "max": 0.8252064010309481
+      },
+      "alive_dead_f1": {
+        "mean": 0.9654283727646451,
+        "min": 0.964853219968978,
+        "max": 0.9660035255603122
+      },
+      "team_acc_gt_alive": {
+        "mean": 0.7843907196753626,
+        "min": 0.7762337343481464,
+        "max": 0.7925477050025787
+      },
+      "n_gt_spells": {
+        "mean": 395.5,
+        "min": 370.0,
+        "max": 421.0
+      },
+      "n_pred_spells": {
+        "mean": 2012.0,
+        "min": 1914.0,
+        "max": 2110.0
+      },
+      "fragmentation": {
+        "mean": 4.41075816075816,
+        "min": 4.347490347490347,
+        "max": 4.474025974025974
+      }
+    },
+    "source": "Bassek, Rein, Weber et al., Sci Data 12, 195 (2025), doi:10.1038/s41597-025-04505-y, CC BY 4.0"
+  },
+  {
+    "timestamp": "2026-11-16T03:06:59",
+    "predictor": "dead_ball_v1_dsegment_counts",
+    "script_sha256": "44cb9ca1e60684cb5427595b16abf4b476b3aec9c813ae33fe4c17463438325d",
+    "config_sha256": "086752c9892223577075b95356af44dd41fca28f50ede9b8768a7c7832c3fe27",
+    "tables": "degraded",
+    "seeds": [
+      0,
+      1,
+      2
+    ],
+    "matches": [
+      "J03WPY",
+      "J03WR9"
+    ],
+    "summary": {
+      "d_segs_pred": 126.5,
+      "d_segs_gt": 94.5,
+      "pred_short_lt_1s": 0.168,
+      "d_share_pred": 0.426,
+      "d_share_gt": 0.431
+    },
+    "source": "Bassek, Rein, Weber et al., Sci Data 12, 195 (2025), doi:10.1038/s41597-025-04505-y, CC BY 4.0"
+  },
+  {
+    "timestamp": "2026-11-16T03:06:59",
+    "predictor": "dead_ball_v1_dsegment_counts",
+    "script_sha256": "44cb9ca1e60684cb5427595b16abf4b476b3aec9c813ae33fe4c17463438325d",
+    "config_sha256": "086752c9892223577075b95356af44dd41fca28f50ede9b8768a7c7832c3fe27",
+    "tables": "clean",
+    "seeds": null,
+    "matches": [
+      "J03WPY",
+      "J03WR9"
+    ],
+    "summary": {
+      "d_segs_pred": 147.5,
+      "d_segs_gt": 94.5,
+      "pred_short_lt_1s": 0.188,
+      "d_share_pred": 0.406,
+      "d_share_gt": 0.431
+    },
+    "source": "Bassek, Rein, Weber et al., Sci Data 12, 195 (2025), doi:10.1038/s41597-025-04505-y, CC BY 4.0"
+  },
+  {
+    "timestamp": "2026-11-17T11:10:06",
+    "predictor": "decoder_v1",
+    "script_sha256": "68c2de84e7722e35b2cf5a364d782ea808362f8b03bddf1df1458bfd04fbb257",
+    "config_sha256": "ef6fb3b4ce8f4e79c47f8d79db5d9c472ef6430a7e19def4ed9d24f25abcf2a4",
+    "tables": "degraded",
+    "seeds": [
+      0,
+      1,
+      2
+    ],
+    "matches": [
+      "J03WPY",
+      "J03WR9"
+    ],
+    "summary": {
+      "spell_f1_mean": {
+        "mean": 0.4168955472306119,
+        "min": 0.3993798449612403,
+        "max": 0.43371428571428583
+      },
+      "spell_f1_at_headline": {
+        "mean": 0.4236341418686824,
+        "min": 0.4006259780907668,
+        "max": 0.45042492917847027
+      },
+      "macro_f1": {
+        "mean": 0.8510711318978309,
+        "min": 0.8475194678515034,
+        "max": 0.8557517905280928
+      },
+      "alive_dead_f1": {
+        "mean": 0.950178789255096,
+        "min": 0.9466003745076516,
+        "max": 0.9525903164491624
+      },
+      "team_acc_gt_alive": {
+        "mean": 0.8235589683541592,
+        "min": 0.8194125369215622,
+        "max": 0.8282151061934455
+      },
+      "n_gt_spells": {
+        "mean": 395.5,
+        "min": 370.0,
+        "max": 421.0
+      },
+      "n_pred_spells": {
+        "mean": 279.3333333333333,
+        "min": 269.0,
+        "max": 287.0
+      },
+      "fragmentation": {
+        "mean": 0.8312760812760812,
+        "min": 0.7644787644787645,
+        "max": 0.9090909090909091
+      }
+    },
+    "source": "Bassek, Rein, Weber et al., Sci Data 12, 195 (2025), doi:10.1038/s41597-025-04505-y, CC BY 4.0"
+  }
+]
