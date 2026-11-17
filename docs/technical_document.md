@@ -164,7 +164,7 @@ This model estimates p(home has the ball) from player shape only, with the ball 
 
 ## 4. Parameters
 
-All 44 keys in `features/config.json` are listed below (keys starting with `_` excluded). The full source and reason for each is in `_provenance`. For tuned keys, the tuning data are the IDSSE tuning matches J03WMX, J03WN1, J03WOH, J03WOY, J03WQQ: degraded tables (a priori ball loss), seeds 0–2, 15 runs. The target is the DFL proxy labels via `pm.evaluate`, and the objective is mean spell_f1_mean.
+All 44 pipeline keys in `features/config.json` are listed below (keys starting with `_` excluded). The config also holds 7 `broadcast_align_*` keys (a priori, diagnostic only, not read by the decoder or the submission; see `docs/broadcast-alignment-design.md`). The full source and reason for each is in `_provenance`. For tuned keys, the tuning data are the IDSSE tuning matches J03WMX, J03WN1, J03WOH, J03WOY, J03WQQ: degraded tables (a priori ball loss), seeds 0–2, 15 runs. The target is the DFL proxy labels via `pm.evaluate`, and the objective is mean spell_f1_mean.
 
 ### 4.1 Feature extraction
 

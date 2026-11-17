@@ -373,3 +373,16 @@ Chosen **2.0**, spell_f1_mean **0.418** in-sample (run 2: 0.3905, +0.027), macro
 Review follow-ups (2026-11-16, not done yet; each touches a file whose sha256 a log records): a LOMO diagnostic refit without `own_half_frac`/`adv_x` and without `spread` (collinear inputs with opposing terms amplify noise if BAR-ATH's correlation structure differs; diagnostic only, not selection); tests for `team_shape.load()`, `decode()` end to end, the per-match fold selection in `tune_decoder._init`, and the ball-known/margin-NaN case; `raise` instead of `assert` for the fold-leakage guards; pin `team_shape.py`'s sha in the model check. The `possession_decoder.py` docstring was corrected after run 3 (text only), so its logged sha256 no longer matches.
 
 **Clean-clone test, run-3 config (2026-11-16, commit 60b2645).** Fresh HTTPS clone of origin, raw data copied in without `data/derived/`, `sh reproduce.sh`: exit 0 in 30 s; `submission.csv` sha256 17511abfaffd9e4f57404f20d24c19b7b1145633b8c050ed052213fdcff52053, identical to the main repo's.
+
+## 2026-11-16: broadcast alignment v1 on BAR-ATH (`features/broadcast_align.py --report`, diagnostic only)
+
+Tracking-only alignment of the broadcast ATD (164,488 frames, 51 slots) to the tactical timeline: constant-offset segments matched on player positions (no identities, no pixels), replays flagged, all parameters a priori (IDSSE has no broadcast). Not read by the decoder or the submission. Run time 3.7 min. Label-free aggregates:
+
+- **Orientation:** coarse match share 98.6% as given vs 31.2% teams swapped, 36.5% y mirrored, 36.5% rotated 180°. The conventions agree.
+- **Coverage:** players on 96.8% of broadcast frames, at least 6 players on 62.7%. Mapped live 57.6%, replay 1.4%, unmapped 41.0%. 197 live segments, 26 replay segments, 7 dropped; live map strictly increasing.
+- **Match quality:** player match distance median 0.29 m, p90 0.53 m.
+- **Offsets:** tactical minus broadcast frame, min 2442, median 4015, max 26964; 37 distinct values; distinct live offsets per tactical block {0: 5, 1: 16, 3: 18}. **Not explained yet:** a single live feed should keep about one offset per half. Many distinct offsets within a half mean either small re-fits (a few frames apart) or real jumps (gaps in the broadcast recording); the spread per block was not printed.
+- **Ball gaps (the key diagnostic):** 64,643 graded tactical frames have the raw tactical ball missing; 20,074 of them have a live-mapped broadcast frame, 5,871 a broadcast ball seen. Split by the dead-ball call: D 56,923 missing, 2,674 with broadcast ball; **alive 7,720 missing, 3,197 (41%) with broadcast ball**.
+- **Ball consistency where both see it** (69,241 frames): distance median 0.76 m, p90 5.4 m. The p90 is large next to the 0.5 m player match.
+
+Caveats (review, 2026-11-16): the counts use the raw tactical ball, so they include short gaps the feature table already interpolates; the false-replay and still-stoppage risks in the design note apply; the B1 fix (segments never merge across a half block) was made after this run and changes only the per-block summary, not the mapped frames. Wiring the broadcast ball into the pipeline is not decided; it cannot be validated on IDSSE.
