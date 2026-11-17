@@ -5,6 +5,7 @@ tables via an injected loader; no real files.
     .venv/bin/python features/tests/test_harness.py
 """
 
+import json
 import os
 import sys
 
@@ -69,6 +70,17 @@ def main():
     raises(PermissionError, hz.run, oracle, "holdout", "clean", (), loader=loader)
     raises(ValueError, hz.split_ids, "holdout", True, [hz.ef.IDSSE_TUNE[0]])
     raises(PermissionError, hz.load_table, hz.ef.IDSSE_HOLDOUT[0], "clean", None)
+
+    # Tracked logs: every tuned key must cite a log frozen_config checks.
+    cfg = hz.load_config()
+    hz.check_tracked_logs(cfg)
+    tuned = next(k for k, v in cfg["_provenance"].items() if v["basis"] == "tuned_external")
+    for log in (None, {"path": "results/tuning/dead_ball_tune/crosscheck.json"}):
+        bad = json.loads(json.dumps(cfg))
+        bad["_provenance"][tuned].pop("tune_log")
+        if log:
+            bad["_provenance"][tuned]["tune_log"] = log
+        raises(ValueError, hz.check_tracked_logs, bad)
     print("test_harness: all checks passed")
 
 

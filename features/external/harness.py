@@ -48,10 +48,10 @@ import possession_metrics as pm  # noqa: E402
 EXT = os.path.join(ROOT, "external_data")
 CONFIG_PATH = os.path.join(ROOT, "features", "config.json")
 HOLDOUT_LOG = os.path.join(EXT, "harness", "holdout_log.json")
-DEAD_BALL_TUNE_LOG = os.path.join(EXT, "dead_ball_tune", "tune_log.json")
-DEAD_BALL_MIN_DEAD_LOG = os.path.join(EXT, "dead_ball_tune", "tune_log_min_dead.json")
-DECODER_TUNE_LOG = os.path.join(EXT, "decoder_tune", "tune_log.json")
-DECODER_TUNE_LOG_RUN2 = os.path.join(EXT, "decoder_tune", "tune_log_run2.json")
+DEAD_BALL_TUNE_LOG = os.path.join(ROOT, "results", "tuning", "dead_ball_tune", "tune_log.json")
+DEAD_BALL_MIN_DEAD_LOG = os.path.join(ROOT, "results", "tuning", "dead_ball_tune", "tune_log_min_dead.json")
+DECODER_TUNE_LOG = os.path.join(ROOT, "results", "tuning", "decoder_tune", "tune_log.json")
+DECODER_TUNE_LOG_RUN2 = os.path.join(ROOT, "results", "tuning", "decoder_tune", "tune_log_run2.json")
 LEAK_COLUMNS = ["label", "ball_dropped"]
 SEAM_ROWS = max(pm.TAUS) + 1
 SHOW = ["spell_f1_mean", "spell_f1_at_headline", "macro_f1", "alive_dead_f1",
@@ -110,18 +110,31 @@ def load_config():
     return cfg
 
 
+def check_tracked_logs(cfg):
+    """Every tuned key's provenance must name one of the tune logs frozen_config checks."""
+    checked = {os.path.relpath(p, ROOT) for p in (DEAD_BALL_TUNE_LOG, DEAD_BALL_MIN_DEAD_LOG,
+                                                   DECODER_TUNE_LOG, DECODER_TUNE_LOG_RUN2)}
+    bad = {k: v.get("tune_log", {}).get("path") for k, v in cfg["_provenance"].items()
+           if v["basis"] == "tuned_external"}
+    bad = {k: p for k, p in bad.items() if p not in checked}
+    if bad:
+        raise ValueError("tuned keys whose tune log is missing or not checked by frozen_config: {}".format(bad))
+
+
 def frozen_config(decoder=True):
     """load_config(), checked against both dead-ball tune logs and (decoder=True) the decoder tune
     logs, run 1 for the keys run 2 did not re-tune (tune_dead_ball.frozen_from_log). Every path that runs the tuned pipeline loads its config
     through here; only tune_decoder.py passes decoder=False."""
     import tune_dead_ball
     cfg = load_config()
+    check_tracked_logs(cfg)
     tune_dead_ball.frozen_from_log(DEAD_BALL_TUNE_LOG, cfg)
     tune_dead_ball.frozen_from_log(DEAD_BALL_MIN_DEAD_LOG, cfg)
     if decoder:
         with open(DECODER_TUNE_LOG_RUN2) as f:
             run2 = json.load(f)
-        assert run2["prior_log"]["sha256"] == sha256(DECODER_TUNE_LOG), "run-2 log rests on another run-1 log"
+        if run2["prior_log"]["sha256"] != sha256(DECODER_TUNE_LOG):
+            raise ValueError("run-2 log rests on another run-1 log")
         tune_dead_ball.frozen_from_log(DECODER_TUNE_LOG, cfg, skip=run2["chosen"])
         tune_dead_ball.frozen_from_log(DECODER_TUNE_LOG_RUN2, cfg)
     return cfg

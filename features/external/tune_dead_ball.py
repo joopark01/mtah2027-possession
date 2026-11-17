@@ -1,10 +1,10 @@
 """Grid-tune the dead-ball detector's player-based keys (dead_ball.TUNABLE) on IDSSE.
 
-    python features/external/tune_dead_ball.py --tune --log external_data/dead_ball_tune/tune_log.json --workers 7
+    python features/external/tune_dead_ball.py --tune --log results/tuning/dead_ball_tune/tune_log.json --workers 7
     python features/external/tune_dead_ball.py --crosscheck --log ... --out ... --workers 7
     python features/external/tune_dead_ball.py --check --log ...      # config == log's chosen row
     python features/external/tune_dead_ball.py --tune-one dead_min_dead_frames \
-        --log external_data/dead_ball_tune/tune_log_min_dead.json --workers 5
+        --log results/tuning/dead_ball_tune/tune_log_min_dead.json --workers 5
 
 Data: Bassek, Rein, Weber et al., Sci Data 12, 195 (2025), doi:10.1038/s41597-025-04505-y,
 CC BY 4.0. EXTERNAL data only; BAR-ATH never goes through this script.

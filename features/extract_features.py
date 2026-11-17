@@ -480,7 +480,8 @@ def check_provenance(cfg):
 
     Fails if a key has no provenance entry, an entry has no matching key, a field is missing, the
     basis is not one of PROVENANCE_BASES, or tuned_on disagrees with basis. 'tuned_external' is
-    the only basis that may (and must) name a tuning dataset, and it must not be the provided game.
+    the only basis that may (and must) name a tuning dataset, and it must not be the provided game;
+    a tune_log, if given, must be a file in results/tuning/ with the sha256 the provenance records.
     """
     keys = {k for k in cfg if not k.startswith("_")}
     prov = cfg["_provenance"]
@@ -513,6 +514,19 @@ def check_provenance(cfg):
                 raise ValueError("{!r} names a held-out IDSSE match as tuning data".format(key))
         elif tuned is not None:
             raise ValueError("{!r} has tuned_on but basis {!r}".format(key, entry["basis"]))
+        # a tune log is tracked in results/tuning/ and must be the file the provenance names
+        # (harness.frozen_config requires one for every tuned key of config.json)
+        if "tune_log" in entry:
+            log = entry["tune_log"]
+            if not os.path.normpath(log["path"]).startswith(os.path.join("results", "tuning", "")):
+                raise ValueError("{!r}: tune_log path {!r} not under results/tuning/".format(
+                    key, log["path"]))
+            path = os.path.join(ROOT, log["path"])
+            if not os.path.isfile(path):
+                raise ValueError("{!r}: tune log {} missing".format(key, log["path"]))
+            with open(path, "rb") as f:
+                if hashlib.sha256(f.read()).hexdigest() != log["sha256"]:
+                    raise ValueError("{!r}: {} sha256 != provenance".format(key, log["path"]))
 
 
 # -- driver -------------------------------------------------------------------------------------

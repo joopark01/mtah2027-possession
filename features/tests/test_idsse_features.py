@@ -5,6 +5,7 @@ made-up npz in a temp dir, no real data.
     .venv/bin/python features/tests/test_idsse_features.py
 """
 
+import hashlib
 import json
 import os
 import sys
@@ -130,7 +131,29 @@ def main():
     ok["_provenance"]["fps"].update(basis="tuned_external",
                                     tuned_on="IDSSE J03WMX; held out J03WPY,J03WR9",
                                     target="IDSSE DFL BallStatus")
+    untracked = json.loads(json.dumps(ok))
+    for path, why in (("external_data/tune_log.json", "results/tuning/"),
+                      ("results/tuning/../../data/x.json", "results/tuning/"),
+                      ("results/tuning/no_such_log.json", "missing")):
+        untracked["_provenance"]["fps"]["tune_log"] = {"path": path, "sha256": "0"}
+        try:
+            ef.check_provenance(untracked)
+        except ValueError as e:
+            assert why in str(e), e
+        else:
+            raise AssertionError("tune log {} must be refused".format(path))
+    log = "results/tuning/decoder_tune/tune_log_run2.json"
+    with open(os.path.join(ef.ROOT, log), "rb") as f:
+        ok["_provenance"]["fps"]["tune_log"] = {"path": log, "sha256": hashlib.sha256(f.read()).hexdigest()}
     ef.check_provenance(ok)
+    stale = json.loads(json.dumps(ok))
+    stale["_provenance"]["fps"]["tune_log"]["sha256"] = "0" * 64
+    try:
+        ef.check_provenance(stale)
+    except ValueError as e:
+        assert "sha256" in str(e), e
+    else:
+        raise AssertionError("a tune log whose sha256 differs from the provenance must be refused")
     no_target = json.loads(json.dumps(ok))
     no_target["_provenance"]["fps"].pop("target")
     try:

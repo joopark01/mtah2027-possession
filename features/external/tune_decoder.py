@@ -1,7 +1,7 @@
-"""Grid-tune the possession decoder's decoder_* keys on IDSSE (run 2026-11-16, log external_data/decoder_tune/tune_log.json).
+"""Grid-tune the possession decoder's decoder_* keys on IDSSE (run 2026-11-16, log results/tuning/decoder_tune/tune_log.json).
 
-    python features/external/tune_decoder.py --log external_data/decoder_tune/tune_log.json --workers 7
-    python features/external/tune_decoder.py --run2 --log external_data/decoder_tune/tune_log_run2.json --workers 7
+    python features/external/tune_decoder.py --log results/tuning/decoder_tune/tune_log.json --workers 7
+    python features/external/tune_decoder.py --run2 --log results/tuning/decoder_tune/tune_log_run2.json --workers 7
 
 Run 2 widens only the keys run 1 chose at a grid edge (GRID_RUN2), with every other key, and the
 a priori point, at the run-1 chosen values (config checked against the run-1 log first).

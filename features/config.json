@@ -232,7 +232,7 @@
       "reason": "A priori: Whistle -> deceleration lag. A D gap's start = onset of the stopped run (smoothed speed and walking past their thresholds) minus this lag. 1 s: about 0.2-0.3 s auditory reaction plus the time for the mean speed of 20 players to fall to walking pace. First-principles guess (a priori value 25). Tuned value 0 (2026-11-16: full joint grid over dead_ball.TUNABLE (15000 combos; this key over [0, 12, 25, 50, 75]), objective: maximise mean spell_f1_mean over the 15 degraded runs (5 tuning matches x seeds [0, 1, 2]), harness.run -> pm.evaluate; tie rule: among combos within 0.002 of the best mean spell_f1_mean, pick the highest mean alive_dead_f1; if still tied (equal to 1e-12), the one closest to the a priori values (sum over keys of |grid index - a priori grid index|), then the first in grid order. Chosen 0. On the edge of its grid (see docs/findings.md, dead-ball detector tuning)).",
       "tuned_on": "IDSSE J03WMX, J03WN1, J03WOH, J03WOY, J03WQQ (degraded a priori ball-loss, seeds 0-2); held out J03WPY, J03WR9",
       "target": "IDSSE DFL BallStatus/BallPossession proxy labels, spell_f1_mean via evaluation/possession_metrics.py. Never BAR-ATH GT or video.",
-      "tune_log": {"path": "external_data/dead_ball_tune/tune_log.json", "sha256": "8df0242aa07fa1f6acc4904ce26637e552d2abe88a94b003c7bd2dec74fd5e86", "timestamp": "2026-11-16T01:29:24"}
+      "tune_log": {"path": "results/tuning/dead_ball_tune/tune_log.json", "sha256": "8df0242aa07fa1f6acc4904ce26637e552d2abe88a94b003c7bd2dec74fd5e86", "timestamp": "2026-11-16T01:29:24"}
     },
     "dead_smooth_half_window_frames": {
       "basis": "tuned_external",
@@ -240,7 +240,7 @@
       "reason": "A priori: Change-point / smoothing window: walking share and mean speed are averaged over +/-12 frames (about 1 s, same as ball_still_half_window_frames) inside the half block, so single-frame tracking noise neither starts nor breaks a stopped run (a priori value 12). Tuned value 0 (2026-11-16: full joint grid over dead_ball.TUNABLE (15000 combos; this key over [0, 3, 6, 12, 18, 25]), objective: maximise mean spell_f1_mean over the 15 degraded runs (5 tuning matches x seeds [0, 1, 2]), harness.run -> pm.evaluate; tie rule: among combos within 0.002 of the best mean spell_f1_mean, pick the highest mean alive_dead_f1; if still tied (equal to 1e-12), the one closest to the a priori values (sum over keys of |grid index - a priori grid index|), then the first in grid order. Chosen 0. On the edge of its grid (see docs/findings.md, dead-ball detector tuning)).",
       "tuned_on": "IDSSE J03WMX, J03WN1, J03WOH, J03WOY, J03WQQ (degraded a priori ball-loss, seeds 0-2); held out J03WPY, J03WR9",
       "target": "IDSSE DFL BallStatus/BallPossession proxy labels, spell_f1_mean via evaluation/possession_metrics.py. Never BAR-ATH GT or video.",
-      "tune_log": {"path": "external_data/dead_ball_tune/tune_log.json", "sha256": "8df0242aa07fa1f6acc4904ce26637e552d2abe88a94b003c7bd2dec74fd5e86", "timestamp": "2026-11-16T01:29:24"}
+      "tune_log": {"path": "results/tuning/dead_ball_tune/tune_log.json", "sha256": "8df0242aa07fa1f6acc4904ce26637e552d2abe88a94b003c7bd2dec74fd5e86", "timestamp": "2026-11-16T01:29:24"}
     },
     "dead_walking_frac_min": {
       "basis": "tuned_external",
@@ -248,7 +248,7 @@
       "reason": "A priori: Players stopped: smoothed share of players walking (min of the two teams; all_walking_frac where a team's share is NaN) at least 0.8, i.e. all but about 4 of 22 walking (a keeper or a set-piece taker may still jog). A first-principles value; not blind: the BAR-ATH label-free gap aggregates (median 0.95 in long gaps vs 0.62 with the ball seen, docs/findings.md) had been seen (a priori value 0.8). Tuned value 0.7 (2026-11-16: full joint grid over dead_ball.TUNABLE (15000 combos; this key over [0.6, 0.7, 0.8, 0.9, 0.95]), objective: maximise mean spell_f1_mean over the 15 degraded runs (5 tuning matches x seeds [0, 1, 2]), harness.run -> pm.evaluate; tie rule: among combos within 0.002 of the best mean spell_f1_mean, pick the highest mean alive_dead_f1; if still tied (equal to 1e-12), the one closest to the a priori values (sum over keys of |grid index - a priori grid index|), then the first in grid order. Chosen 0.7).",
       "tuned_on": "IDSSE J03WMX, J03WN1, J03WOH, J03WOY, J03WQQ (degraded a priori ball-loss, seeds 0-2); held out J03WPY, J03WR9",
       "target": "IDSSE DFL BallStatus/BallPossession proxy labels, spell_f1_mean via evaluation/possession_metrics.py. Never BAR-ATH GT or video.",
-      "tune_log": {"path": "external_data/dead_ball_tune/tune_log.json", "sha256": "8df0242aa07fa1f6acc4904ce26637e552d2abe88a94b003c7bd2dec74fd5e86", "timestamp": "2026-11-16T01:29:24"}
+      "tune_log": {"path": "results/tuning/dead_ball_tune/tune_log.json", "sha256": "8df0242aa07fa1f6acc4904ce26637e552d2abe88a94b003c7bd2dec74fd5e86", "timestamp": "2026-11-16T01:29:24"}
     },
     "dead_mean_speed_max_m_s": {
       "basis": "tuned_external",
@@ -256,7 +256,7 @@
       "reason": "A priori: Players stopped: smoothed all_mean_speed at most 1.5 m/s, about ordinary human walking pace (~1.4 m/s, e.g. Bohannon 1997, Age Ageing) and below the 2.0 m/s walking/jogging zone boundary. Not blind: the BAR-ATH label-free aggregates (median 1.00 m/s in gaps vs 1.93 seen) had been seen (a priori value 1.5). Tuned value 2.0 (2026-11-16: full joint grid over dead_ball.TUNABLE (15000 combos; this key over [1.0, 1.25, 1.5, 2.0, 2.5]), objective: maximise mean spell_f1_mean over the 15 degraded runs (5 tuning matches x seeds [0, 1, 2]), harness.run -> pm.evaluate; tie rule: among combos within 0.002 of the best mean spell_f1_mean, pick the highest mean alive_dead_f1; if still tied (equal to 1e-12), the one closest to the a priori values (sum over keys of |grid index - a priori grid index|), then the first in grid order. Chosen 2.0).",
       "tuned_on": "IDSSE J03WMX, J03WN1, J03WOH, J03WOY, J03WQQ (degraded a priori ball-loss, seeds 0-2); held out J03WPY, J03WR9",
       "target": "IDSSE DFL BallStatus/BallPossession proxy labels, spell_f1_mean via evaluation/possession_metrics.py. Never BAR-ATH GT or video.",
-      "tune_log": {"path": "external_data/dead_ball_tune/tune_log.json", "sha256": "8df0242aa07fa1f6acc4904ce26637e552d2abe88a94b003c7bd2dec74fd5e86", "timestamp": "2026-11-16T01:29:24"}
+      "tune_log": {"path": "results/tuning/dead_ball_tune/tune_log.json", "sha256": "8df0242aa07fa1f6acc4904ce26637e552d2abe88a94b003c7bd2dec74fd5e86", "timestamp": "2026-11-16T01:29:24"}
     },
     "dead_min_gap_frames": {
       "basis": "tuned_external",
@@ -264,7 +264,7 @@
       "reason": "A ball-unknown run is a D candidate (a) only if at least 50 frames (2 s) long: a stoppage and restart (fetch, place, take) takes at least about 2 s, and 50 is well above the 12-frame interpolation limit so dropouts in play are not candidates. A priori value 50. Tuned 2026-11-16: full joint grid over dead_ball.TUNABLE (15000 combos; this key over [25, 50, 100, 150]), objective: maximise mean spell_f1_mean over the 15 degraded runs (5 tuning matches x seeds [0, 1, 2]), harness.run -> pm.evaluate; tie rule: among combos within 0.002 of the best mean spell_f1_mean, pick the highest mean alive_dead_f1; if still tied (equal to 1e-12), the one closest to the a priori values (sum over keys of |grid index - a priori grid index|), then the first in grid order. Chosen 50.",
       "tuned_on": "IDSSE J03WMX, J03WN1, J03WOH, J03WOY, J03WQQ (degraded a priori ball-loss, seeds 0-2); held out J03WPY, J03WR9",
       "target": "IDSSE DFL BallStatus/BallPossession proxy labels, spell_f1_mean via evaluation/possession_metrics.py. Never BAR-ATH GT or video.",
-      "tune_log": {"path": "external_data/dead_ball_tune/tune_log.json", "sha256": "8df0242aa07fa1f6acc4904ce26637e552d2abe88a94b003c7bd2dec74fd5e86", "timestamp": "2026-11-16T01:29:24"}
+      "tune_log": {"path": "results/tuning/dead_ball_tune/tune_log.json", "sha256": "8df0242aa07fa1f6acc4904ce26637e552d2abe88a94b003c7bd2dec74fd5e86", "timestamp": "2026-11-16T01:29:24"}
     },
     "dead_min_alive_frames": {
       "basis": "tuned_external",
@@ -272,7 +272,7 @@
       "reason": "Two D candidates separated by an alive run shorter than 25 frames (1 s), inside one half block, are merged: a restart followed by another stoppage within 1 s is implausible, and a spurious alive blip costs extra spells under spellF1. A priori value 25. Tuned 2026-11-16: full joint grid over dead_ball.TUNABLE (15000 combos; this key over [0, 12, 25, 50, 75]), objective: maximise mean spell_f1_mean over the 15 degraded runs (5 tuning matches x seeds [0, 1, 2]), harness.run -> pm.evaluate; tie rule: among combos within 0.002 of the best mean spell_f1_mean, pick the highest mean alive_dead_f1; if still tied (equal to 1e-12), the one closest to the a priori values (sum over keys of |grid index - a priori grid index|), then the first in grid order. Chosen 25.",
       "tuned_on": "IDSSE J03WMX, J03WN1, J03WOH, J03WOY, J03WQQ (degraded a priori ball-loss, seeds 0-2); held out J03WPY, J03WR9",
       "target": "IDSSE DFL BallStatus/BallPossession proxy labels, spell_f1_mean via evaluation/possession_metrics.py. Never BAR-ATH GT or video.",
-      "tune_log": {"path": "external_data/dead_ball_tune/tune_log.json", "sha256": "8df0242aa07fa1f6acc4904ce26637e552d2abe88a94b003c7bd2dec74fd5e86", "timestamp": "2026-11-16T01:29:24"}
+      "tune_log": {"path": "results/tuning/dead_ball_tune/tune_log.json", "sha256": "8df0242aa07fa1f6acc4904ce26637e552d2abe88a94b003c7bd2dec74fd5e86", "timestamp": "2026-11-16T01:29:24"}
     },
     "dead_min_dead_frames": {
       "basis": "tuned_external",
@@ -280,7 +280,7 @@
       "reason": "After candidate merging, every predicted D segment shorter than this many frames becomes alive (0 = off); segments holding a ctx known_dead frame are never dropped. Tuned 2026-11-16 by a one-key search (tune_dead_ball.py --tune-one) over [0, 12, 25, 38, 50] frames with every other dead_* key held at its config value; objective: maximise mean spell_f1_mean over the 15 degraded runs (5 tuning matches x seeds [0, 1, 2]), harness.run -> pm.evaluate; tie rule (declared before the run): highest mean spell_f1_mean; if the top values are within 0.001 of each other, take the smallest value among them. All five values lay within 0.001 of the best (25: 0.1222; 0: 0.1212), so 0 (off) was chosen. Clean tuning tables scored as a cross-check only, not used for selection. Not blind: the key was proposed after the 2026-11-16 held-out D-segment count look (16.8-18.8% of predicted held-out segments under 1 s) and the label-free BAR-ATH report (13 of 145 under 1 s) had been seen; the user decided the grid and the tuning-only objective. With 0 chosen the detector is identical to the version scored on held-out. The joint dead_* grid (tune_log.json) ran before this key existed, i.e. with it effectively 0.",
       "tuned_on": "IDSSE J03WMX, J03WN1, J03WOH, J03WOY, J03WQQ (degraded a priori ball-loss, seeds 0-2); held out J03WPY, J03WR9",
       "target": "IDSSE DFL BallStatus/BallPossession proxy labels, spell_f1_mean via evaluation/possession_metrics.py. Never BAR-ATH GT or video.",
-      "tune_log": {"path": "external_data/dead_ball_tune/tune_log_min_dead.json", "sha256": "34880d83e7486b0d4c9889c2fd0bd109bd3ebe46d1ebdfbb7e84cfc8010481f9", "timestamp": "2026-11-16T10:21:58"}
+      "tune_log": {"path": "results/tuning/dead_ball_tune/tune_log_min_dead.json", "sha256": "34880d83e7486b0d4c9889c2fd0bd109bd3ebe46d1ebdfbb7e84cfc8010481f9", "timestamp": "2026-11-16T10:21:58"}
     },
     "dead_onset_max_lookback_frames": {
       "basis": "a_priori",
@@ -294,7 +294,7 @@
       "reason": "Per-frame team score = clip(nearest_margin_m / this, -1, 1): +1 = home clearly closer, -1 = away. 2 m (about one stride) is where being closer stops being ambiguous: within it, a challenge or tracking error can swap the nearest player; beyond it, the closer team can play the ball first. Below the 3 m near-ball radius. Set before any decoder run. A priori value 2.0. Tuned value 1.0 (2026-11-16: full grid over the six decoder_* keys, 729 combos; this key over [1.0, 2.0, 4.0]; objective: maximise mean spell_f1_mean over the 15 degraded runs (5 tuning matches x seeds [0, 1, 2]), harness.run -> pm.evaluate, with the dead_* values frozen; tie rule: among combos within 0.002 of the best mean spell_f1_mean, the one closest to the a priori values (sum over keys of |grid index - a priori grid index|), then the first in grid order). Chosen 1.0. Run 2 (2026-11-16, the edge extension: run 1 chose 1.0 at a grid edge, so the three edge keys were re-gridded, this one over [0.25, 0.5, 1.0, 2.0], with decoder_c_score, decoder_switch_penalty and decoder_restart_bias fixed at their run-1 values; a priori point = run-1 chosen values; same objective and tie rule). Chosen 0.25. On the edge of its run-2 grid; one extension only, as for the dead-ball keys, so not extended again (docs/findings.md).",
       "tuned_on": "IDSSE J03WMX, J03WN1, J03WOH, J03WOY, J03WQQ (degraded a priori ball-loss, seeds 0-2); held out J03WPY, J03WR9",
       "target": "IDSSE DFL BallStatus/BallPossession proxy labels, spell_f1_mean via evaluation/possession_metrics.py. Never BAR-ATH GT or video.",
-      "tune_log": {"path": "external_data/decoder_tune/tune_log_run2.json", "sha256": "7672fb2c559b726595683a52fe220596e40ae6bd46be929e2faad05175ecc6fe", "timestamp": "2026-11-16T23:03:12"}
+      "tune_log": {"path": "results/tuning/decoder_tune/tune_log_run2.json", "sha256": "7672fb2c559b726595683a52fe220596e40ae6bd46be929e2faad05175ecc6fe", "timestamp": "2026-11-16T23:03:12"}
     },
     "decoder_c_score": {
       "basis": "tuned_external",
@@ -302,7 +302,7 @@
       "reason": "Per-frame score of the contested/loose state C where both teams, or neither, have a player within 3 m (a duel, or the ball in flight). 1.0 = as strong as a clear (>= 2 m margin) team frame: a duel or a ball in flight is as clear a sign that nobody controls it. Elsewhere C scores 0. C never splits a spell (its frames take the preceding team's label). Set before any decoder run. A priori value 1.0. Tuned value 0.5 (2026-11-16: full grid over the six decoder_* keys, 729 combos; this key over [0.0, 0.5, 1.0]; objective: maximise mean spell_f1_mean over the 15 degraded runs (5 tuning matches x seeds [0, 1, 2]), harness.run -> pm.evaluate, with the dead_* values frozen; tie rule: among combos within 0.002 of the best mean spell_f1_mean, the one closest to the a priori values (sum over keys of |grid index - a priori grid index|), then the first in grid order). Chosen 0.5.",
       "tuned_on": "IDSSE J03WMX, J03WN1, J03WOH, J03WOY, J03WQQ (degraded a priori ball-loss, seeds 0-2); held out J03WPY, J03WR9",
       "target": "IDSSE DFL BallStatus/BallPossession proxy labels, spell_f1_mean via evaluation/possession_metrics.py. Never BAR-ATH GT or video.",
-      "tune_log": {"path": "external_data/decoder_tune/tune_log.json", "sha256": "cebb88d7214a8033607cf831963549d4e105cda75435c8dbe685193010deb4d5", "timestamp": "2026-11-16T10:33:01"}
+      "tune_log": {"path": "results/tuning/decoder_tune/tune_log.json", "sha256": "cebb88d7214a8033607cf831963549d4e105cda75435c8dbe685193010deb4d5", "timestamp": "2026-11-16T10:33:01"}
     },
     "decoder_switch_penalty": {
       "basis": "tuned_external",
@@ -310,7 +310,7 @@
       "reason": "Viterbi cost of a direct H<->A switch, in per-frame score units. A clearly contrary frame costs 2 (from +1 to -1), so 50 = a switch needs about 1 s (25 frames) of clear contrary evidence: about a pass's flight time, so a ball passing near opponents does not flip possession, yet an order of magnitude below a typical possession of 10-15 s, so real changes still switch. The plain HMM rule log(spell length in frames) = log(300) ~ 6 would be far too small here: the per-frame scores are strongly autocorrelated, so a few frames of noise would switch. Set before any decoder run. A priori value 50.0. Tuned value 50.0 (2026-11-16: full grid over the six decoder_* keys, 729 combos; this key over [25.0, 50.0, 100.0]; objective: maximise mean spell_f1_mean over the 15 degraded runs (5 tuning matches x seeds [0, 1, 2]), harness.run -> pm.evaluate, with the dead_* values frozen; tie rule: among combos within 0.002 of the best mean spell_f1_mean, the one closest to the a priori values (sum over keys of |grid index - a priori grid index|), then the first in grid order). Chosen 50.0.",
       "tuned_on": "IDSSE J03WMX, J03WN1, J03WOH, J03WOY, J03WQQ (degraded a priori ball-loss, seeds 0-2); held out J03WPY, J03WR9",
       "target": "IDSSE DFL BallStatus/BallPossession proxy labels, spell_f1_mean via evaluation/possession_metrics.py. Never BAR-ATH GT or video.",
-      "tune_log": {"path": "external_data/decoder_tune/tune_log.json", "sha256": "cebb88d7214a8033607cf831963549d4e105cda75435c8dbe685193010deb4d5", "timestamp": "2026-11-16T10:33:01"}
+      "tune_log": {"path": "results/tuning/decoder_tune/tune_log.json", "sha256": "cebb88d7214a8033607cf831963549d4e105cda75435c8dbe685193010deb4d5", "timestamp": "2026-11-16T10:33:01"}
     },
     "decoder_c_entry_penalty": {
       "basis": "tuned_external",
@@ -318,7 +318,7 @@
       "reason": "Viterbi cost of H/A -> C. Half the switch penalty, with decoder_c_exit_penalty the other half, so a change of team via a loose ball (H -> C -> A) costs the same as a direct switch: C changes where a switch lands (when the other team gains control), not how much evidence it needs. Set before any decoder run. A priori value 25.0. Tuned value 12.0 (2026-11-16: full grid over the six decoder_* keys, 729 combos; this key over [12.0, 25.0, 50.0]; objective: maximise mean spell_f1_mean over the 15 degraded runs (5 tuning matches x seeds [0, 1, 2]), harness.run -> pm.evaluate, with the dead_* values frozen; tie rule: among combos within 0.002 of the best mean spell_f1_mean, the one closest to the a priori values (sum over keys of |grid index - a priori grid index|), then the first in grid order). Chosen 12.0. Run 2 (2026-11-16, the edge extension: run 1 chose 12.0 at a grid edge, so the three edge keys were re-gridded, this one over [3.0, 6.0, 12.0, 25.0], with decoder_c_score, decoder_switch_penalty and decoder_restart_bias fixed at their run-1 values; a priori point = run-1 chosen values; same objective and tie rule). Chosen 3.0. On the edge of its run-2 grid; one extension only, as for the dead-ball keys, so not extended again (docs/findings.md).",
       "tuned_on": "IDSSE J03WMX, J03WN1, J03WOH, J03WOY, J03WQQ (degraded a priori ball-loss, seeds 0-2); held out J03WPY, J03WR9",
       "target": "IDSSE DFL BallStatus/BallPossession proxy labels, spell_f1_mean via evaluation/possession_metrics.py. Never BAR-ATH GT or video.",
-      "tune_log": {"path": "external_data/decoder_tune/tune_log_run2.json", "sha256": "7672fb2c559b726595683a52fe220596e40ae6bd46be929e2faad05175ecc6fe", "timestamp": "2026-11-16T23:03:12"}
+      "tune_log": {"path": "results/tuning/decoder_tune/tune_log_run2.json", "sha256": "7672fb2c559b726595683a52fe220596e40ae6bd46be929e2faad05175ecc6fe", "timestamp": "2026-11-16T23:03:12"}
     },
     "decoder_c_exit_penalty": {
       "basis": "tuned_external",
@@ -326,7 +326,7 @@
       "reason": "Viterbi cost of C -> H/A. The other half of the switch penalty (see decoder_c_entry_penalty). Set before any decoder run. A priori value 25.0. Tuned value 12.0 (2026-11-16: full grid over the six decoder_* keys, 729 combos; this key over [12.0, 25.0, 50.0]; objective: maximise mean spell_f1_mean over the 15 degraded runs (5 tuning matches x seeds [0, 1, 2]), harness.run -> pm.evaluate, with the dead_* values frozen; tie rule: among combos within 0.002 of the best mean spell_f1_mean, the one closest to the a priori values (sum over keys of |grid index - a priori grid index|), then the first in grid order). Chosen 12.0. Run 2 (2026-11-16, the edge extension: run 1 chose 12.0 at a grid edge, so the three edge keys were re-gridded, this one over [3.0, 6.0, 12.0, 25.0], with decoder_c_score, decoder_switch_penalty and decoder_restart_bias fixed at their run-1 values; a priori point = run-1 chosen values; same objective and tie rule). Chosen 25.0. On the edge of its run-2 grid; one extension only, as for the dead-ball keys, so not extended again (docs/findings.md).",
       "tuned_on": "IDSSE J03WMX, J03WN1, J03WOH, J03WOY, J03WQQ (degraded a priori ball-loss, seeds 0-2); held out J03WPY, J03WR9",
       "target": "IDSSE DFL BallStatus/BallPossession proxy labels, spell_f1_mean via evaluation/possession_metrics.py. Never BAR-ATH GT or video.",
-      "tune_log": {"path": "external_data/decoder_tune/tune_log_run2.json", "sha256": "7672fb2c559b726595683a52fe220596e40ae6bd46be929e2faad05175ecc6fe", "timestamp": "2026-11-16T23:03:12"}
+      "tune_log": {"path": "results/tuning/decoder_tune/tune_log_run2.json", "sha256": "7672fb2c559b726595683a52fe220596e40ae6bd46be929e2faad05175ecc6fe", "timestamp": "2026-11-16T23:03:12"}
     },
     "decoder_restart_bias": {
       "basis": "tuned_external",
@@ -334,7 +334,7 @@
       "reason": "When an alive span starts at a D segment whose restart_team is H or A, the other two states start this much lower. Laws 8, 13-17: the restart team plays the ball first, so starting with the other team is treated like a switch from the restart team: the same 50 as decoder_switch_penalty. Set before any decoder run. A priori value 50.0. Tuned value 50.0 (2026-11-16: full grid over the six decoder_* keys, 729 combos; this key over [0.0, 50.0, 100.0]; objective: maximise mean spell_f1_mean over the 15 degraded runs (5 tuning matches x seeds [0, 1, 2]), harness.run -> pm.evaluate, with the dead_* values frozen; tie rule: among combos within 0.002 of the best mean spell_f1_mean, the one closest to the a priori values (sum over keys of |grid index - a priori grid index|), then the first in grid order). Chosen 50.0.",
       "tuned_on": "IDSSE J03WMX, J03WN1, J03WOH, J03WOY, J03WQQ (degraded a priori ball-loss, seeds 0-2); held out J03WPY, J03WR9",
       "target": "IDSSE DFL BallStatus/BallPossession proxy labels, spell_f1_mean via evaluation/possession_metrics.py. Never BAR-ATH GT or video.",
-      "tune_log": {"path": "external_data/decoder_tune/tune_log.json", "sha256": "cebb88d7214a8033607cf831963549d4e105cda75435c8dbe685193010deb4d5", "timestamp": "2026-11-16T10:33:01"}
+      "tune_log": {"path": "results/tuning/decoder_tune/tune_log.json", "sha256": "cebb88d7214a8033607cf831963549d4e105cda75435c8dbe685193010deb4d5", "timestamp": "2026-11-16T10:33:01"}
     }
   }
 }
