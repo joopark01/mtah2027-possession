@@ -11,8 +11,12 @@ the decoder_* keys plus the dead_* keys the detector reads. No defaults here.
    loose), H, A. Scores are log-likelihood-like, per frame:
      H = clip(nearest_margin_m / decoder_margin_full_m, -1, 1), A = -H   (ball position known)
      C = decoder_c_score where both teams or neither team has a player within 3 m, else 0
-   With the ball position unknown (ball_x_m NaN) or the margin NaN, all three are 0 (flat), so
-   the transition penalties carry the state through. Transitions: H<->A costs
+   With the ball position unknown (ball_x_m NaN) or the margin NaN,
+     H = decoder_shape_weight * (2 p_home - 1), A = -H
+   and C is 0 when the ball position is unknown (with the ball known but the margin NaN, C keeps
+   the 3 m rule above)
+   with p_home from the team-shape model (team_shape.py, file decoder_shape_model); at weight 0
+   all three are 0 (flat), so the transition penalties carry the state through. Transitions: H<->A costs
    decoder_switch_penalty, H/A->C decoder_c_entry_penalty, C->H/A decoder_c_exit_penalty.
    Initial state: if the span starts at a detector D segment's end with restart_team H or A, the
    other two states start at -decoder_restart_bias; else all start at 0.
@@ -32,9 +36,11 @@ import pandas as pd
 
 import dead_ball as db
 import extract_features as ef
+import team_shape
 
 KEYS = ("decoder_margin_full_m", "decoder_c_score", "decoder_switch_penalty",
         "decoder_c_entry_penalty", "decoder_c_exit_penalty", "decoder_restart_bias")
+SHAPE_KEYS = ("decoder_shape_weight", "decoder_shape_model")
 C, H, A = 0, 1, 2
 OUT = np.array(["C", "H", "A"])
 
@@ -45,12 +51,22 @@ def transition_matrix(cfg):
     return -np.array([[0.0, ex, ex], [en, 0.0, s], [en, s, 0.0]])
 
 
-def emissions(df, cfg):
-    """[N, 3] per-frame scores for C, H, A."""
+def ball_unknown(df):
+    """Rows where the team score cannot use the ball: ball position or nearest margin unknown."""
+    return ~(df["ball_x_m"].notna().to_numpy() & np.isfinite(df["nearest_margin_m"].to_numpy(float)))
+
+
+def emissions(df, cfg, p_home):
+    """[N, 3] per-frame scores for C, H, A. p_home: team-shape p(H) per row, used where the ball
+    position or the margin is unknown."""
     assert cfg["decoder_margin_full_m"] > 0 and cfg["decoder_c_score"] >= 0
+    assert cfg["decoder_shape_weight"] >= 0, cfg["decoder_shape_weight"]
+    p_home = np.asarray(p_home, float)
+    assert p_home.shape == (len(df),) and ((p_home >= 0) & (p_home <= 1)).all(), "bad p_home"
     known = df["ball_x_m"].notna().to_numpy()
     m = df["nearest_margin_m"].to_numpy(float)
-    team = np.where(known & np.isfinite(m), np.clip(m / cfg["decoder_margin_full_m"], -1, 1), 0.0)
+    team = np.where(ball_unknown(df), cfg["decoder_shape_weight"] * (2.0 * p_home - 1.0),
+                    np.clip(m / cfg["decoder_margin_full_m"], -1, 1))
     h3 = df["h_n_within_3m"].to_numpy(float) > 0       # NaN (ball unknown) -> False
     a3 = df["a_n_within_3m"].to_numpy(float) > 0
     c = np.where(known & (h3 == a3), float(cfg["decoder_c_score"]), 0.0)
@@ -75,12 +91,14 @@ def viterbi(e, trans, init):
 
 
 def decode(df, cfg, ctx):
-    return decode_from(df, cfg, db.detect(df, cfg, ctx))
+    p_home = team_shape.predict(df, team_shape.load(cfg))
+    return decode_from(df, cfg, db.detect(df, cfg, ctx), p_home)
 
 
-def decode_from(df, cfg, det):
-    """decode() with a precomputed dead_ball.detect result for this df (tuning reuses it)."""
-    for k in KEYS:
+def decode_from(df, cfg, det, p_home):
+    """decode() with a precomputed dead_ball.detect result and team-shape p_home for this df
+    (tuning reuses the detector output and passes out-of-fold p_home)."""
+    for k in KEYS + SHAPE_KEYS:
         assert k in cfg, "config lacks " + k
     for k in ("decoder_switch_penalty", "decoder_c_entry_penalty", "decoder_c_exit_penalty",
               "decoder_restart_bias"):
@@ -92,7 +110,7 @@ def decode_from(df, cfg, det):
     half = df["half"].to_numpy()
     blocks = [(a, b) for a, b in ef.block_spans(half) if half[a] > 0]
     restart = {e: t for (_, e), t in zip(det["segments"], det["restart_team"])}
-    e_all, trans = emissions(df, cfg), transition_matrix(cfg)
+    e_all, trans = emissions(df, cfg, p_home), transition_matrix(cfg)
     nt = df["nearest_team"].to_numpy()
     known = df["ball_x_m"].notna().to_numpy()
 

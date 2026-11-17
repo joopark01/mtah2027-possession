@@ -26,22 +26,26 @@ import tune_decoder as td  # noqa: E402
 hz, dec = td.hz, td.pd_
 with open(os.path.join(HERE, "..", "config.json")) as f:
     CFG = json.load(f)
-# Test values, independent of later tuning: margin saturates at 2 m, switch costs 50.
+# Test values, independent of later tuning: margin saturates at 2 m, switch costs 50, team-shape
+# weight 0 (decoder v1; the shape hook is tested in test_team_shape.py).
 CFG.update(decoder_margin_full_m=2.0, decoder_c_score=1.0, decoder_switch_penalty=50.0,
-           decoder_c_entry_penalty=25.0, decoder_c_exit_penalty=25.0, decoder_restart_bias=50.0)
+           decoder_c_entry_penalty=25.0, decoder_c_exit_penalty=25.0, decoder_restart_bias=50.0,
+           decoder_shape_weight=0.0)
 CTX = {"known_dead": [], "smart_tagging": False}
+HALF = lambda df: np.full(len(df), 0.5)     # team-shape p_home with no evidence
 
 
 def table(n, halves=None, margin=3.0):
     """Live play: ball known in the pitch and moving, players running, home 3 m clearer, only home
-    within 3 m."""
-    return pd.DataFrame({
+    within 3 m. Team-shape columns NaN (p_home 0.5)."""
+    shape = {c: np.full(n, np.nan) for c in dec.team_shape.columns()}
+    return pd.DataFrame(dict(shape, **{
         "half": np.ones(n, np.int8) if halves is None else np.asarray(halves, np.int8),
         "ball_x_m": np.full(n, 50.0), "ball_out_m": np.full(n, -5.0), "ball_still_frac": np.zeros(n),
         "nearest_team": np.zeros(n, np.int8), "nearest_margin_m": np.full(n, margin),
         "h_n_within_3m": np.ones(n), "a_n_within_3m": np.zeros(n),
         "h_walking_frac": np.full(n, 0.3), "a_walking_frac": np.full(n, 0.3),
-        "all_walking_frac": np.full(n, 0.3), "all_mean_speed": np.full(n, 3.0)})
+        "all_walking_frac": np.full(n, 0.3), "all_mean_speed": np.full(n, 3.0)}))
 
 
 def away(df, a, b, margin=-3.0):
@@ -118,9 +122,9 @@ def main():
     df.loc[200:229, ["nearest_margin_m"]] = 0.5
     df.loc[230:, ["ball_x_m", "nearest_margin_m"]] = np.nan
     d = det(400, [(100, 200)], ["A"])
-    assert runs(dec.decode_from(df, CFG, d)) == [(0, 100, "H"), (100, 200, "D"), (200, 400, "A")]
+    assert runs(dec.decode_from(df, CFG, d, HALF(df))) == [(0, 100, "H"), (100, 200, "D"), (200, 400, "A")]
     d = det(400, [(100, 200)], ["unknown"])
-    assert runs(dec.decode_from(df, CFG, d)) == [(0, 100, "H"), (100, 200, "D"), (200, 400, "H")]
+    assert runs(dec.decode_from(df, CFG, d, HALF(df))) == [(0, 100, "H"), (100, 200, "D"), (200, 400, "H")]
 
     # 7. Span with no evidence and no restart team -> carried from the block; a block with
     # nothing known at all -> D.
@@ -128,10 +132,10 @@ def main():
     df.loc[200:, ["ball_x_m", "nearest_margin_m"]] = np.nan
     df.loc[200:, "nearest_team"] = -1
     away(df, 0, 100)
-    lab = dec.decode_from(df, CFG, det(400, [(100, 200)], ["unknown"]))
+    lab = dec.decode_from(df, CFG, det(400, [(100, 200)], ["unknown"]), HALF(df))
     assert runs(lab) == [(0, 100, "A"), (100, 200, "D"), (200, 400, "A")], runs(lab)
     df.loc[:, ["ball_x_m", "nearest_margin_m"]] = np.nan
-    lab = dec.decode_from(df, CFG, det(400, [(100, 200)], ["unknown"]))
+    lab = dec.decode_from(df, CFG, det(400, [(100, 200)], ["unknown"]), HALF(df))
     assert set(lab) == {"D"}, runs(lab)
 
     # 8. Noise: iid random margins never produce short spells. An inner H/A run costs at least 50

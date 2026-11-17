@@ -52,6 +52,8 @@ DEAD_BALL_TUNE_LOG = os.path.join(ROOT, "results", "tuning", "dead_ball_tune", "
 DEAD_BALL_MIN_DEAD_LOG = os.path.join(ROOT, "results", "tuning", "dead_ball_tune", "tune_log_min_dead.json")
 DECODER_TUNE_LOG = os.path.join(ROOT, "results", "tuning", "decoder_tune", "tune_log.json")
 DECODER_TUNE_LOG_RUN2 = os.path.join(ROOT, "results", "tuning", "decoder_tune", "tune_log_run2.json")
+DECODER_TUNE_LOG_RUN3 = os.path.join(ROOT, "results", "tuning", "decoder_tune", "tune_log_run3.json")
+TEAM_SHAPE_MODEL = os.path.join(ROOT, "results", "tuning", "team_shape", "team_shape_model.json")
 LEAK_COLUMNS = ["label", "ball_dropped"]
 SEAM_ROWS = max(pm.TAUS) + 1
 SHOW = ["spell_f1_mean", "spell_f1_at_headline", "macro_f1", "alive_dead_f1",
@@ -113,7 +115,8 @@ def load_config():
 def check_tracked_logs(cfg):
     """Every tuned key's provenance must name one of the tune logs frozen_config checks."""
     checked = {os.path.relpath(p, ROOT) for p in (DEAD_BALL_TUNE_LOG, DEAD_BALL_MIN_DEAD_LOG,
-                                                   DECODER_TUNE_LOG, DECODER_TUNE_LOG_RUN2)}
+                                                   DECODER_TUNE_LOG, DECODER_TUNE_LOG_RUN2,
+                                                   DECODER_TUNE_LOG_RUN3, TEAM_SHAPE_MODEL)}
     bad = {k: v.get("tune_log", {}).get("path") for k, v in cfg["_provenance"].items()
            if v["basis"] == "tuned_external"}
     bad = {k: p for k, p in bad.items() if p not in checked}
@@ -123,8 +126,10 @@ def check_tracked_logs(cfg):
 
 def frozen_config(decoder=True):
     """load_config(), checked against both dead-ball tune logs and (decoder=True) the decoder tune
-    logs, run 1 for the keys run 2 did not re-tune (tune_dead_ball.frozen_from_log). Every path that runs the tuned pipeline loads its config
-    through here; only tune_decoder.py passes decoder=False."""
+    logs, run 1 for the keys run 2 did not re-tune (tune_dead_ball.frozen_from_log), run 3 for
+    decoder_shape_weight, and the team-shape model file run 3 used (TEAM_SHAPE_MODEL; its sha256 is
+    also in its provenance, checked by check_provenance). Every path that runs the tuned pipeline
+    loads its config through here; only tune_decoder.py passes decoder=False."""
     import tune_dead_ball
     cfg = load_config()
     check_tracked_logs(cfg)
@@ -137,6 +142,15 @@ def frozen_config(decoder=True):
             raise ValueError("run-2 log rests on another run-1 log")
         tune_dead_ball.frozen_from_log(DECODER_TUNE_LOG, cfg, skip=run2["chosen"])
         tune_dead_ball.frozen_from_log(DECODER_TUNE_LOG_RUN2, cfg)
+        with open(DECODER_TUNE_LOG_RUN3) as f:
+            run3 = json.load(f)
+        if run3["prior_log"]["sha256"] != sha256(DECODER_TUNE_LOG_RUN2):
+            raise ValueError("run-3 log rests on another run-2 log")
+        if os.path.join(ROOT, cfg["decoder_shape_model"]) != TEAM_SHAPE_MODEL:
+            raise ValueError("decoder_shape_model {} is not {}".format(cfg["decoder_shape_model"], TEAM_SHAPE_MODEL))
+        if run3["shape_model"]["sha256"] != sha256(TEAM_SHAPE_MODEL):
+            raise ValueError("run-3 log was tuned with another team-shape model file")
+        tune_dead_ball.frozen_from_log(DECODER_TUNE_LOG_RUN3, cfg)
     return cfg
 
 

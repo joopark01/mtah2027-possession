@@ -325,4 +325,49 @@ Chosen: **margin_full 0.25 m, c_entry 3, c_exit 25**, spell_f1_mean **0.3905** (
 - The log's script, harness, decoder and detector sha256 match the files as committed with the run, except `harness.py`: after the run, `frozen_config` was changed to take the skip set from the run-2 log and to assert its `prior_log` sha. The search code is unchanged. Later, when the logs moved to `results/tuning/`, the docstrings of `tune_decoder.py` and `tune_dead_ball.py` had their log paths updated (text only).
 
 **Tune logs tracked (2026-11-16, user decision).** `external_data/dead_ball_tune/` and `external_data/decoder_tune/` were moved unchanged (same sha256) to `results/tuning/`. Config provenance paths now point there; `check_provenance` refuses a `tune_log` outside `results/tuning/`, missing, or with a different sha256, and `harness.frozen_config` refuses a tuned key without one. The archived BAR-ATH-fitted ball-loss variant keeps its log in `external_data/` and is not committed.
+
+**BAR-ATH submission with the run-2 decoder config** (`make_submission.py`, validator OK, label-free aggregates): of graded frames H 51,439 (32.4%), A 38,984 (24.5%), D 68,434 (43.1%); X 40,462 ungraded frames. sha256 d47ab2db…. The validator printed no possession count this time.
+
+**Clean-clone test (2026-11-16, commit 80a2541).** Fresh HTTPS clone of origin, raw data copied in without `data/derived/`, `sh reproduce.sh`: exit 0 in 31 s; the feature table was rebuilt from the raw ATD and `submission.csv` has the same sha256 as the main repo's (d47ab2db…), i.e. byte-for-byte identical.
 - In-sample only; held out is reserved for the one final evaluation of the full pipeline.
+
+## 2026-11-16: team-shape model on ball-unknown live frames, decoder tuning run 3
+
+**Design.** `features/team_shape.py`: p(home has the ball) from player shape only, ball hidden. Inputs are the home-minus-away differences of eight feature-table columns: `adv_x_m`, `adv_vx`, `own_half_frac` (attack-direction normalised per team) and `std_x_m`, `std_y_m`, `spread_m`, `mean_speed`, `walking_frac` (direction-free). No ball-derived column; `test_team_shape.py` asserts it. The model is a logistic regression without intercept on the differences, scaled by their RMS (no centring), so swapping the teams gives exactly 1 - p and no home bias can be learned. NaN features contribute 0. The fit (`features/external/fit_team_shape.py`) is a Newton fit with L2 = 1.0 fixed a priori: a unit Gaussian prior on each scaled coefficient, which barely shrinks at ~3e5 frames. Training rows are the alive frames (DFL label H or A) of the clean tables of the 5 tuning matches. The eight h_/a_ column pairs are bit-identical in all 15 degraded tables (asserted in the fit), so degradation touches only the ball. Model, LOMO fold models, counts, metrics and data sha256 are in `results/tuning/team_shape/team_shape_model.json` (sha256 44d8f500…).
+
+**Decoder hook.** On frames where the ball position or the nearest margin is unknown (`possession_decoder.ball_unknown`), the H score is `decoder_shape_weight * (2p - 1)`, A = -H, C = 0. Ball-known frames are unchanged. Weight 0 is decoder v1 (tested; it also reproduces run 2's 0.39054 exactly).
+
+**Per-match training counts** (alive H / A; ball-unknown alive frames in degraded seeds 0/1/2): J03WMX 39111 / 46258 (16156 / 16574 / 17158); J03WN1 36421 / 31956 (17998 / 10880 / 13488); J03WOH 39126 / 32819 (12464 / 18528 / 12715); J03WOY 37812 / 38474 (15800 / 13439 / 11933); J03WQQ 37030 / 47322 (13966 / 11240 / 15036).
+
+**Leave-one-match-out** (fit on 4, predict the 5th; accuracy at p > 0.5 / mean log loss):
+
+| match | alive frames, clean | ball-unknown alive, degraded (3 seeds) |
+|---|---|---|
+| J03WMX | 0.841 / 0.377 | 0.856 / 0.350 |
+| J03WN1 | 0.758 / 0.511 | 0.756 / 0.518 |
+| J03WOH | 0.838 / 0.372 | 0.854 / 0.341 |
+| J03WOY | 0.826 / 0.393 | 0.863 / 0.335 |
+| J03WQQ | 0.841 / 0.350 | 0.852 / 0.347 |
+| pooled | **0.823 / 0.397** (n 386,329) | **0.837 / 0.377** (n 217,375) |
+
+Final coefficients (all 5 matches, scaled units): adv_x -1.95, adv_vx +0.71, own_half_frac -1.29, std_x +0.23, std_y +1.51, spread +0.34, mean_speed -0.61, walking_frac -0.03. adv_x and own_half_frac are strongly collinear (both say where the play is), so their opposite signs are not separately interpretable. The team in possession is wider (std_y), the play moves toward its attacking goal (adv_vx difference = both centroids' velocity along its attack direction), and its players run slower than the defenders on average.
+
+**Run 3** (`tune_decoder.py --run3`, log `results/tuning/decoder_tune/tune_log_run3.json`, sha256 9ee02baf…): only `decoder_shape_weight`, all other keys frozen at run-2 values, run-2 log as `prior_log`. Same tables, seeds, objective and tie rule. The a priori value 0.5 and the grid were declared in `GRID_RUN3` before the fit. p_home for each tuning match comes from its LOMO fold model, so no match is scored with a model that saw it.
+
+| weight | 0 | 0.125 | 0.25 | 0.5 (a priori) | 1.0 | 2.0 |
+|---|---|---|---|---|---|---|
+| spell_f1_mean | 0.3905 | 0.3990 | 0.4042 | 0.4113 | 0.4151 | **0.4178** |
+| team acc (GT alive) | 0.785 | 0.796 | 0.800 | 0.802 | 0.803 | 0.804 |
+| pred spells / match | 275 | 278 | 283 | 289 | 294 | 300 |
+
+Chosen **2.0**, spell_f1_mean **0.418** in-sample (run 2: 0.3905, +0.027), macro_f1 0.842. **It sits on the top edge of the grid**; 1.0 is 0.0026 below, just outside the tie band. Not extended without a decision. The curve is flattening (+0.004, +0.003 per doubling). An ad-hoc harness `decoder_v1` run on the tuning tables with the final all-5 model (not logged, not used for any choice) also gave 0.418, so out-of-fold and in-sample shape probabilities score about the same here.
+
+**Risks.**
+- **Transfer, IDSSE shape to BAR-ATH:** the model learned Bundesliga team shapes from clean player tracking. BAR-ATH has noisier tracking and different teams, and a possession style like Barcelona's (long, wide home possessions) may move the shape-to-possession map. Antisymmetry removes home bias but not a team-style bias. Weight 2.0 means shape evidence counts twice a clear ball frame on ball-unknown live frames. On BAR-ATH those frames are mostly stoppages that the detector calls D (11.9% of ball-missing frames are called alive), so the model matters only on the live remainder.
+- **Ball-unknown frames on IDSSE come from the a priori degradation;** their share and placement on BAR-ATH may differ.
+- **Edge choice** (above). The gain from 0.5 to 2.0 is 0.006, small; the run-3 log stores means only, so its per-run spread is not recorded.
+- Held out not used; reserved for the one final evaluation of the full pipeline.
+
+**BAR-ATH submission with the run-3 config (team-shape weight 2.0)** (`make_submission.py`, validator OK, label-free aggregates): of graded frames H 53,421 (33.6%), A 37,002 (23.3%), D 68,434 (43.1%); X 40,462 ungraded frames; sha256 17511abf…. D is unchanged from run 2 (the model only re-scores alive frames); 1,982 graded frames moved from A to H on net. The label-free D-segment report is unchanged (145 segments).
+
+Review follow-ups (2026-11-16, not done yet; each touches a file whose sha256 a log records): a LOMO diagnostic refit without `own_half_frac`/`adv_x` and without `spread` (collinear inputs with opposing terms amplify noise if BAR-ATH's correlation structure differs; diagnostic only, not selection); tests for `team_shape.load()`, `decode()` end to end, the per-match fold selection in `tune_decoder._init`, and the ball-known/margin-NaN case; `raise` instead of `assert` for the fold-leakage guards; pin `team_shape.py`'s sha in the model check. The `possession_decoder.py` docstring was corrected after run 3 (text only), so its logged sha256 no longer matches.

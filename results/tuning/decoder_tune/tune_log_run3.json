@@ -1,0 +1,135 @@
+{
+ "timestamp": "2026-11-16T23:23:03",
+ "grid": {
+  "decoder_shape_weight": [
+   0.0,
+   0.125,
+   0.25,
+   0.5,
+   1.0,
+   2.0
+  ]
+ },
+ "a_priori": {
+  "decoder_shape_weight": 0.5
+ },
+ "fixed": {
+  "dead_out_margin_m": 0.61,
+  "dead_placed_still_frac_min": 0.5,
+  "dead_vanish_offset_frames": 0,
+  "dead_reappear_offset_frames": 0,
+  "dead_decel_lag_frames": 0,
+  "dead_onset_max_lookback_frames": 125,
+  "dead_smooth_half_window_frames": 0,
+  "dead_walking_frac_min": 0.7,
+  "dead_mean_speed_max_m_s": 2.0,
+  "dead_min_gap_frames": 50,
+  "dead_min_alive_frames": 25,
+  "dead_min_dead_frames": 0,
+  "decoder_margin_full_m": 0.25,
+  "decoder_c_score": 0.5,
+  "decoder_switch_penalty": 50.0,
+  "decoder_c_entry_penalty": 3.0,
+  "decoder_c_exit_penalty": 25.0,
+  "decoder_restart_bias": 50.0,
+  "decoder_shape_model": "results/tuning/team_shape/team_shape_model.json"
+ },
+ "seeds": [
+  0,
+  1,
+  2
+ ],
+ "tables": "degraded (ball_loss_variant a_priori)",
+ "tune_ids": [
+  "J03WMX",
+  "J03WN1",
+  "J03WOH",
+  "J03WOY",
+  "J03WQQ"
+ ],
+ "held_out_ids_not_used": [
+  "J03WPY",
+  "J03WR9"
+ ],
+ "objective": "maximise mean spell_f1_mean over the degraded runs (tuning matches x seeds [0, 1, 2]), harness.run -> pm.evaluate",
+ "tie_rule": "among combos within 0.002 of the best mean spell_f1_mean, the one closest to the a priori values (sum over keys of |grid index - a priori grid index|), then the first in grid order",
+ "script_sha256": "93f0d28a8b885b2c7b964cb8de262e454d766fc31dfd085d9088683d0946380a",
+ "harness_sha256": "68c2de84e7722e35b2cf5a364d782ea808362f8b03bddf1df1458bfd04fbb257",
+ "decoder_sha256": "fdad05523654a22acf1e2b1e2588aee74e4284ca74060c77b7ba1494a934feda",
+ "detector_sha256": "2c700d924f3fa964558788407a4d34ebe0f80458126b85bb92861448175915d1",
+ "team_shape_sha256": "8e86d278f6cc6f83c61e27306bb1f47b969f3833ed36338365abc45ca7c079de",
+ "shape_model": {
+  "path": "results/tuning/team_shape/team_shape_model.json",
+  "sha256": "44d8f5008c3f8959fab06e8b390b1f3005f11307733dc07e91330ce4608eaa7b",
+  "p_home": "leave-one-match-out fold models (lomo_folds)"
+ },
+ "config_sha256": "3a1a1554fafa7e4902c05c6fc8b67be2fba0a0a93af992800ebc01481fcdc6dd",
+ "source": "Bassek, Rein, Weber et al., Sci Data 12, 195 (2025), doi:10.1038/s41597-025-04505-y, CC BY 4.0",
+ "prior_log": {
+  "path": "results/tuning/decoder_tune/tune_log_run2.json",
+  "sha256": "7672fb2c559b726595683a52fe220596e40ae6bd46be929e2faad05175ecc6fe",
+  "timestamp": "2026-11-16T23:03:12"
+ },
+ "status": "done",
+ "n_combos": 6,
+ "chosen": {
+  "decoder_shape_weight": 2.0
+ },
+ "chosen_scores": {
+  "spell_f1_mean": 0.4177632564442692,
+  "macro_f1": 0.8421058523213086,
+  "team_acc_gt_alive": 0.8039194320164059,
+  "n_pred_spells": 299.8,
+  "n_gt_spells": 454.0
+ },
+ "results": [
+  {
+   "decoder_shape_weight": 0.0,
+   "spell_f1_mean": 0.3905378504651855,
+   "macro_f1": 0.8297404131585348,
+   "team_acc_gt_alive": 0.7854731460597228,
+   "n_pred_spells": 274.8,
+   "n_gt_spells": 454.0
+  },
+  {
+   "decoder_shape_weight": 0.125,
+   "spell_f1_mean": 0.39895833215888504,
+   "macro_f1": 0.8370784568091129,
+   "team_acc_gt_alive": 0.796469148526611,
+   "n_pred_spells": 278.2,
+   "n_gt_spells": 454.0
+  },
+  {
+   "decoder_shape_weight": 0.25,
+   "spell_f1_mean": 0.4041817339787018,
+   "macro_f1": 0.8394601643480477,
+   "team_acc_gt_alive": 0.800065454753971,
+   "n_pred_spells": 283.1333333333333,
+   "n_gt_spells": 454.0
+  },
+  {
+   "decoder_shape_weight": 0.5,
+   "spell_f1_mean": 0.4113444187487413,
+   "macro_f1": 0.8406851401756609,
+   "team_acc_gt_alive": 0.8018133708568465,
+   "n_pred_spells": 288.53333333333336,
+   "n_gt_spells": 454.0
+  },
+  {
+   "decoder_shape_weight": 1.0,
+   "spell_f1_mean": 0.4151349742577099,
+   "macro_f1": 0.841603271837977,
+   "team_acc_gt_alive": 0.8031904347907897,
+   "n_pred_spells": 294.0,
+   "n_gt_spells": 454.0
+  },
+  {
+   "decoder_shape_weight": 2.0,
+   "spell_f1_mean": 0.4177632564442692,
+   "macro_f1": 0.8421058523213086,
+   "team_acc_gt_alive": 0.8039194320164059,
+   "n_pred_spells": 299.8,
+   "n_gt_spells": 454.0
+  }
+ ]
+}
