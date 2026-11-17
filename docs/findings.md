@@ -306,3 +306,21 @@ Chosen: margin_full 1.0 m (a priori 2.0), c_score 0.5 (1.0), switch 50 (50), c_e
 - **Three keys sit at their grid edge** (margin 1.0, c_entry 12, c_exit 12). The optimum may lie beyond them. The decoder now predicts fewer spells than the truth (289 vs 454), so lower entry/exit penalties may help further. Extending the grid is a second tuning run on the tuning split; not done without a decision.
 
 **BAR-ATH submission with the tuned decoder** (`features/make_submission.py`, validator OK, label-free aggregates): H 26.5%, A 18.9%, D 34.3%, X 20.3% of all frames; the validator counts 426 possessions of mean 8.5 s (a priori decoder: 224 of 16.1 s). Per match, IDSSE tuning has 454 true spells.
+
+## 2026-11-16: possession decoder tuning run 2, the edge extension (user decision)
+
+Run 1 left three keys at the low edge of their grid (margin_full 1.0, c_entry 12, c_exit 12). Run 2 re-grids only those three: margin_full {0.25, 0.5, 1.0, 2.0} m, c_entry and c_exit {3, 6, 12, 25}, which is two halvings below the edge plus the run-1 neighbour above. c_score 0.5, switch 50 and restart_bias 50 stay at their run-1 values. 64 combos, same tables, seeds, objective and tie rule; the a priori point for the tie rule is the run-1 choice. The grid was declared in `tune_decoder.py` (`GRID_RUN2`) before the run; `tune --run2` checks the config against the run-1 log first and records it as `prior_log`. Log: `external_data/decoder_tune/tune_log_run2.json` (sha256 7672fb2c…). Tuning split only. The run-1 point (1.0, 12, 12) reproduces exactly in run 2 (0.38136).
+
+Chosen: **margin_full 0.25 m, c_entry 3, c_exit 25**, spell_f1_mean **0.3905** (run 1: 0.3814), macro_f1 0.830, team acc (GT alive) 0.785, 275 predicted spells per match (454 true). It is the only combo in the 0.002 tie band. Best spell_f1 per value (others free):
+
+| key | grid → best spell_f1 |
+|---|---|
+| margin_full_m | 0.25: .391, 0.5: .388, 1.0: .382, 2.0: .372 |
+| c_entry_penalty | 3: .391, 6: .385, 12: .388, 25: .386 |
+| c_exit_penalty | 3: .386, 6: .382, 12: .388, 25: .391 |
+
+- **The gain is small (+0.009, within any reasonable noise band) and all three chosen values sit on a run-2 grid edge.** margin_full 0.25 m and c_entry 3 are at the bottom, near the physical floor of 0 (team score = sign of the nearest-player margin; entering C costs almost nothing). c_exit 25 is at the top and is not a physical bound; exit 50 was tried in run 1 only with entry 12/25/50, never with entry 3 or 6. As for the dead-ball keys, the single extension was used, so this is reported, not extended again. Keeping run 2 over run 1 rests on the declared procedure, not on evidence of a better optimum.
+- **The surface pins the total C cost, not its split.** The good combos lie on a ridge with entry + exit about 24-28: (3, 25) .391, (12, 12) .388, (25, 3) .386, (6, 12) .385. The a priori rationale entry + exit = switch no longer holds (28 < 50), so a change of team still goes through C and switch_penalty and restart_bias stay unidentified (see run 1).
+- **Transfer risk, margin 0.25 m:** IDSSE player tracking is clean and `degrade_ball.py` adds no position noise. On BAR-ATH, with noisier positions (the config assumes about 0.5 m ball error, `dead_out_margin_m`), a 0.25 m saturation makes the team score close to the sign of a noisy margin. Same kind of risk as the dead-ball smoothing 0 and lag 0.
+- The log's script, harness, decoder and detector sha256 match the files as committed with the run, except `harness.py`: after the run, `frozen_config` was changed to take the skip set from the run-2 log and to assert its `prior_log` sha. The search code is unchanged.
+- In-sample only; held out is reserved for the one final evaluation of the full pipeline.

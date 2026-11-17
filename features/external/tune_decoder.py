@@ -1,6 +1,10 @@
 """Grid-tune the possession decoder's decoder_* keys on IDSSE (run 2026-11-16, log external_data/decoder_tune/tune_log.json).
 
     python features/external/tune_decoder.py --log external_data/decoder_tune/tune_log.json --workers 7
+    python features/external/tune_decoder.py --run2 --log external_data/decoder_tune/tune_log_run2.json --workers 7
+
+Run 2 widens only the keys run 1 chose at a grid edge (GRID_RUN2), with every other key, and the
+a priori point, at the run-1 chosen values (config checked against the run-1 log first).
 
 Data: Bassek, Rein, Weber et al., Sci Data 12, 195 (2025), doi:10.1038/s41597-025-04505-y,
 CC BY 4.0. EXTERNAL data only; BAR-ATH never goes through this script.
@@ -24,6 +28,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import harness as hz  # noqa: E402
 import possession_decoder as pd_  # noqa: E402
+import tune_dead_ball  # noqa: E402
 
 SEEDS = (0, 1, 2)
 GRID = {"decoder_margin_full_m": [1.0, 2.0, 4.0],
@@ -32,6 +37,11 @@ GRID = {"decoder_margin_full_m": [1.0, 2.0, 4.0],
         "decoder_c_entry_penalty": [12.0, 25.0, 50.0],
         "decoder_c_exit_penalty": [12.0, 25.0, 50.0],
         "decoder_restart_bias": [0.0, 50.0, 100.0]}
+# Run 2 (2026-11-16): run 1 chose the low edge for these three keys. Each grid adds two halvings
+# below it and keeps the run-1 neighbour above. Declared before run 2 was started.
+GRID_RUN2 = {"decoder_margin_full_m": [0.25, 0.5, 1.0, 2.0],
+             "decoder_c_entry_penalty": [3.0, 6.0, 12.0, 25.0],
+             "decoder_c_exit_penalty": [3.0, 6.0, 12.0, 25.0]}
 SPELL_TIE_BAND = 0.002
 OBJECTIVE = ("maximise mean spell_f1_mean over the degraded runs (tuning matches x seeds {}), "
              "harness.run -> pm.evaluate").format(list(SEEDS))
@@ -94,11 +104,12 @@ def choose(results, grid, apriori):
     return min(near, key=lambda r: apriori_distance(r, grid, apriori))   # min is first on ties
 
 
-def tune(log_path, workers, ids=None, grid=GRID):
+def tune(log_path, workers, ids=None, grid=GRID, prior_log=None):
     if os.path.exists(log_path):
         raise SystemExit("{} exists: refusing to overwrite a tune log".format(log_path))
     ids = hz.split_ids("tune", False, ids)          # refuses held-out ids
     cfg = hz.frozen_config(decoder=False)
+    prior = None if prior_log is None else tune_dead_ball.frozen_from_log(prior_log, cfg)
     apriori = {k: cfg[k] for k in grid}
     for k in grid:
         assert apriori[k] in grid[k], "a priori {}={} not in its grid".format(k, apriori[k])
@@ -112,7 +123,7 @@ def tune(log_path, workers, ids=None, grid=GRID):
             "script_sha256": hz.sha256(os.path.abspath(__file__)),
             "harness_sha256": hz.sha256(hz.__file__), "decoder_sha256": hz.sha256(pd_.__file__),
             "detector_sha256": hz.sha256(hz.dead_ball.__file__),
-            "config_sha256": hz.sha256(hz.CONFIG_PATH), "source": hz.SOURCE}
+            "config_sha256": hz.sha256(hz.CONFIG_PATH), "source": hz.SOURCE, "prior_log": prior}
     os.makedirs(os.path.dirname(os.path.abspath(log_path)), exist_ok=True)
     with open(log_path, "x") as f:           # objective and tie rule on disk before any score
         json.dump(dict(head, status="running", n_combos=len(combos)), f, indent=1)
@@ -130,8 +141,12 @@ def main():
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     p.add_argument("--log", required=True)
     p.add_argument("--workers", type=int, required=True)
+    p.add_argument("--run2", action="store_true", help="GRID_RUN2, after the run-1 log")
     a = p.parse_args()
-    tune(a.log, a.workers)
+    if a.run2:
+        tune(a.log, a.workers, grid=GRID_RUN2, prior_log=hz.DECODER_TUNE_LOG)
+    else:
+        tune(a.log, a.workers)
 
 
 if __name__ == "__main__":

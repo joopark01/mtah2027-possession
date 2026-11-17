@@ -43,11 +43,11 @@
   "dead_min_alive_frames": 25,
   "dead_min_dead_frames": 0,
 
-  "decoder_margin_full_m": 1.0,
+  "decoder_margin_full_m": 0.25,
   "decoder_c_score": 0.5,
   "decoder_switch_penalty": 50.0,
-  "decoder_c_entry_penalty": 12.0,
-  "decoder_c_exit_penalty": 12.0,
+  "decoder_c_entry_penalty": 3.0,
+  "decoder_c_exit_penalty": 25.0,
   "decoder_restart_bias": 50.0,
 
   "_provenance": {
@@ -291,10 +291,10 @@
     "decoder_margin_full_m": {
       "basis": "tuned_external",
       "source": "possession decoder v1 (features/possession_decoder.py); main-session instruction 2026-11-16",
-      "reason": "Per-frame team score = clip(nearest_margin_m / this, -1, 1): +1 = home clearly closer, -1 = away. 2 m (about one stride) is where being closer stops being ambiguous: within it, a challenge or tracking error can swap the nearest player; beyond it, the closer team can play the ball first. Below the 3 m near-ball radius. Set before any decoder run. A priori value 2.0. Tuned value 1.0 (2026-11-16: full grid over the six decoder_* keys, 729 combos; this key over [1.0, 2.0, 4.0]; objective: maximise mean spell_f1_mean over the 15 degraded runs (5 tuning matches x seeds [0, 1, 2]), harness.run -> pm.evaluate, with the dead_* values frozen; tie rule: among combos within 0.002 of the best mean spell_f1_mean, the one closest to the a priori values (sum over keys of |grid index - a priori grid index|), then the first in grid order). Chosen 1.0.",
+      "reason": "Per-frame team score = clip(nearest_margin_m / this, -1, 1): +1 = home clearly closer, -1 = away. 2 m (about one stride) is where being closer stops being ambiguous: within it, a challenge or tracking error can swap the nearest player; beyond it, the closer team can play the ball first. Below the 3 m near-ball radius. Set before any decoder run. A priori value 2.0. Tuned value 1.0 (2026-11-16: full grid over the six decoder_* keys, 729 combos; this key over [1.0, 2.0, 4.0]; objective: maximise mean spell_f1_mean over the 15 degraded runs (5 tuning matches x seeds [0, 1, 2]), harness.run -> pm.evaluate, with the dead_* values frozen; tie rule: among combos within 0.002 of the best mean spell_f1_mean, the one closest to the a priori values (sum over keys of |grid index - a priori grid index|), then the first in grid order). Chosen 1.0. Run 2 (2026-11-16, the edge extension: run 1 chose 1.0 at a grid edge, so the three edge keys were re-gridded, this one over [0.25, 0.5, 1.0, 2.0], with decoder_c_score, decoder_switch_penalty and decoder_restart_bias fixed at their run-1 values; a priori point = run-1 chosen values; same objective and tie rule). Chosen 0.25. On the edge of its run-2 grid; one extension only, as for the dead-ball keys, so not extended again (docs/findings.md).",
       "tuned_on": "IDSSE J03WMX, J03WN1, J03WOH, J03WOY, J03WQQ (degraded a priori ball-loss, seeds 0-2); held out J03WPY, J03WR9",
       "target": "IDSSE DFL BallStatus/BallPossession proxy labels, spell_f1_mean via evaluation/possession_metrics.py. Never BAR-ATH GT or video.",
-      "tune_log": {"path": "external_data/decoder_tune/tune_log.json", "sha256": "cebb88d7214a8033607cf831963549d4e105cda75435c8dbe685193010deb4d5", "timestamp": "2026-11-16T10:33:01"}
+      "tune_log": {"path": "external_data/decoder_tune/tune_log_run2.json", "sha256": "7672fb2c559b726595683a52fe220596e40ae6bd46be929e2faad05175ecc6fe", "timestamp": "2026-11-16T23:03:12"}
     },
     "decoder_c_score": {
       "basis": "tuned_external",
@@ -315,18 +315,18 @@
     "decoder_c_entry_penalty": {
       "basis": "tuned_external",
       "source": "possession decoder v1 (features/possession_decoder.py); main-session instruction 2026-11-16",
-      "reason": "Viterbi cost of H/A -> C. Half the switch penalty, with decoder_c_exit_penalty the other half, so a change of team via a loose ball (H -> C -> A) costs the same as a direct switch: C changes where a switch lands (when the other team gains control), not how much evidence it needs. Set before any decoder run. A priori value 25.0. Tuned value 12.0 (2026-11-16: full grid over the six decoder_* keys, 729 combos; this key over [12.0, 25.0, 50.0]; objective: maximise mean spell_f1_mean over the 15 degraded runs (5 tuning matches x seeds [0, 1, 2]), harness.run -> pm.evaluate, with the dead_* values frozen; tie rule: among combos within 0.002 of the best mean spell_f1_mean, the one closest to the a priori values (sum over keys of |grid index - a priori grid index|), then the first in grid order). Chosen 12.0.",
+      "reason": "Viterbi cost of H/A -> C. Half the switch penalty, with decoder_c_exit_penalty the other half, so a change of team via a loose ball (H -> C -> A) costs the same as a direct switch: C changes where a switch lands (when the other team gains control), not how much evidence it needs. Set before any decoder run. A priori value 25.0. Tuned value 12.0 (2026-11-16: full grid over the six decoder_* keys, 729 combos; this key over [12.0, 25.0, 50.0]; objective: maximise mean spell_f1_mean over the 15 degraded runs (5 tuning matches x seeds [0, 1, 2]), harness.run -> pm.evaluate, with the dead_* values frozen; tie rule: among combos within 0.002 of the best mean spell_f1_mean, the one closest to the a priori values (sum over keys of |grid index - a priori grid index|), then the first in grid order). Chosen 12.0. Run 2 (2026-11-16, the edge extension: run 1 chose 12.0 at a grid edge, so the three edge keys were re-gridded, this one over [3.0, 6.0, 12.0, 25.0], with decoder_c_score, decoder_switch_penalty and decoder_restart_bias fixed at their run-1 values; a priori point = run-1 chosen values; same objective and tie rule). Chosen 3.0. On the edge of its run-2 grid; one extension only, as for the dead-ball keys, so not extended again (docs/findings.md).",
       "tuned_on": "IDSSE J03WMX, J03WN1, J03WOH, J03WOY, J03WQQ (degraded a priori ball-loss, seeds 0-2); held out J03WPY, J03WR9",
       "target": "IDSSE DFL BallStatus/BallPossession proxy labels, spell_f1_mean via evaluation/possession_metrics.py. Never BAR-ATH GT or video.",
-      "tune_log": {"path": "external_data/decoder_tune/tune_log.json", "sha256": "cebb88d7214a8033607cf831963549d4e105cda75435c8dbe685193010deb4d5", "timestamp": "2026-11-16T10:33:01"}
+      "tune_log": {"path": "external_data/decoder_tune/tune_log_run2.json", "sha256": "7672fb2c559b726595683a52fe220596e40ae6bd46be929e2faad05175ecc6fe", "timestamp": "2026-11-16T23:03:12"}
     },
     "decoder_c_exit_penalty": {
       "basis": "tuned_external",
       "source": "possession decoder v1 (features/possession_decoder.py); main-session instruction 2026-11-16",
-      "reason": "Viterbi cost of C -> H/A. The other half of the switch penalty (see decoder_c_entry_penalty). Set before any decoder run. A priori value 25.0. Tuned value 12.0 (2026-11-16: full grid over the six decoder_* keys, 729 combos; this key over [12.0, 25.0, 50.0]; objective: maximise mean spell_f1_mean over the 15 degraded runs (5 tuning matches x seeds [0, 1, 2]), harness.run -> pm.evaluate, with the dead_* values frozen; tie rule: among combos within 0.002 of the best mean spell_f1_mean, the one closest to the a priori values (sum over keys of |grid index - a priori grid index|), then the first in grid order). Chosen 12.0.",
+      "reason": "Viterbi cost of C -> H/A. The other half of the switch penalty (see decoder_c_entry_penalty). Set before any decoder run. A priori value 25.0. Tuned value 12.0 (2026-11-16: full grid over the six decoder_* keys, 729 combos; this key over [12.0, 25.0, 50.0]; objective: maximise mean spell_f1_mean over the 15 degraded runs (5 tuning matches x seeds [0, 1, 2]), harness.run -> pm.evaluate, with the dead_* values frozen; tie rule: among combos within 0.002 of the best mean spell_f1_mean, the one closest to the a priori values (sum over keys of |grid index - a priori grid index|), then the first in grid order). Chosen 12.0. Run 2 (2026-11-16, the edge extension: run 1 chose 12.0 at a grid edge, so the three edge keys were re-gridded, this one over [3.0, 6.0, 12.0, 25.0], with decoder_c_score, decoder_switch_penalty and decoder_restart_bias fixed at their run-1 values; a priori point = run-1 chosen values; same objective and tie rule). Chosen 25.0. On the edge of its run-2 grid; one extension only, as for the dead-ball keys, so not extended again (docs/findings.md).",
       "tuned_on": "IDSSE J03WMX, J03WN1, J03WOH, J03WOY, J03WQQ (degraded a priori ball-loss, seeds 0-2); held out J03WPY, J03WR9",
       "target": "IDSSE DFL BallStatus/BallPossession proxy labels, spell_f1_mean via evaluation/possession_metrics.py. Never BAR-ATH GT or video.",
-      "tune_log": {"path": "external_data/decoder_tune/tune_log.json", "sha256": "cebb88d7214a8033607cf831963549d4e105cda75435c8dbe685193010deb4d5", "timestamp": "2026-11-16T10:33:01"}
+      "tune_log": {"path": "external_data/decoder_tune/tune_log_run2.json", "sha256": "7672fb2c559b726595683a52fe220596e40ae6bd46be929e2faad05175ecc6fe", "timestamp": "2026-11-16T23:03:12"}
     },
     "decoder_restart_bias": {
       "basis": "tuned_external",

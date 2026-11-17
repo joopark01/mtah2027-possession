@@ -195,18 +195,20 @@ def tune_one(key, log_path, workers):
     print("data: " + hz.SOURCE)
 
 
-def frozen_from_log(log_path, cfg):
-    """Config must equal the log's chosen row. Returns the log's path, sha256 and timestamp."""
+def frozen_from_log(log_path, cfg, skip=()):
+    """Config must equal the log's chosen row, except keys in skip (re-tuned by a later run).
+    Returns the log's path, sha256 and timestamp."""
     if not os.path.isfile(log_path):
         raise SystemExit("{} missing: run --tune first".format(log_path))
     with open(log_path) as f:
         log = json.load(f)
     assert log["status"] == "done", "{}: tune not finished".format(log_path)
-    diff = {k: (cfg[k], v) for k, v in dict(log["fixed"], **log["chosen"]).items() if cfg[k] != v}
+    diff = {k: (cfg[k], v) for k, v in dict(log["fixed"], **log["chosen"]).items()
+            if k not in skip and cfg[k] != v}
     if diff:
         raise SystemExit("config differs from the tune log's chosen row (config, log): {}".format(diff))
     sha = hz.sha256(log_path)
-    stale = {k: cfg["_provenance"][k].get("tune_log", {}).get("sha256") for k in log["chosen"]}
+    stale = {k: cfg["_provenance"][k].get("tune_log", {}).get("sha256") for k in log["chosen"] if k not in skip}
     stale = {k: v for k, v in stale.items() if v != sha}
     if stale:
         raise SystemExit("config provenance tune_log sha256 != {} ({}): {}".format(

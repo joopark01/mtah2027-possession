@@ -101,6 +101,10 @@ def main():
                 raise AssertionError("freeze check passed a changed config")
             except SystemExit:
                 pass
+            # skip: a key re-tuned by a later run is exempt from the value and sha checks, others are not
+            bad["_provenance"] = dict(prov, dead_min_gap_frames={})
+            assert td.frozen_from_log(log, bad, skip={"dead_min_gap_frames"})["timestamp"] == out["timestamp"]
+            raises_exit(td.frozen_from_log, log, bad, {"dead_walking_frac_min"})
             # one-key mode: log loads only tuning ids, holds every other dead_* key fixed, and
             # passes the freeze check
             asked.clear()
