@@ -1,3 +1,22 @@
+# MTAH 2027 Initial Challenge: possession per frame (submission repository)
+
+This is a fork of the organisers' repository with our pipeline added. The organisers' original README follows below the line.
+
+**Reproduce the submission:** unpack the provided data bundle into `data/` (`data/tactical/`, `data/broadcast/`, layout as in [DATA.md](DATA.md)). Then, from the repository root, run:
+
+```bash
+sh reproduce.sh
+```
+
+This creates a virtualenv with the pinned `features/requirements.txt` (Python 3), builds the feature table and decodes it with the frozen config. It writes `data/derived/submission.csv`, validates it with `evaluation/validate_submission.py` and prints its sha256. No IDSSE download, tuning or network access beyond pip is needed.
+
+- **Technical document:** [docs/technical_document.md](docs/technical_document.md)
+- **Pipeline code:** `features/`, with the external-data tooling in `features/external/`
+- **Tuning logs:** `results/`
+- **Match data:** not in this repository, and must not be. `data/` is gitignored.
+
+---
+
 # More than a Hack 2027 — Phase 1: Ball Possession
 
 **Organised by [Metrica Sports](https://metrica-sports.com), [FC Barcelona](https://www.fcbarcelona.com)
