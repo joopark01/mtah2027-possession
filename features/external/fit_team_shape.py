@@ -77,7 +77,7 @@ def model_dict(f):
 
 
 def load_tune(ids, seeds, loader):
-    """Per match: clean (d, y) on alive rows; degraded ball-unknown alive (d, y) per seed. Asserts
+    """Per match: clean (d, y) on alive rows; degraded ball-unknown alive (d, y) per seed. Checks
     the shape columns are identical in every degraded table."""
     out = {}
     for mid in ids:
@@ -88,12 +88,13 @@ def load_tune(ids, seeds, loader):
         unk = []
         for s in seeds:
             g = loader(mid, "degraded", s)
-            assert len(g) == len(c) and (g["frame_id"].to_numpy() == c["frame_id"].to_numpy()).all(), \
-                "{} s{}: rows differ from the clean table".format(mid, s)
+            if not (len(g) == len(c) and (g["frame_id"].to_numpy() == c["frame_id"].to_numpy()).all()):
+                raise ValueError("{} s{}: rows differ from the clean table".format(mid, s))
             for col in ts.columns():
-                assert np.array_equal(g[col].to_numpy(float), c[col].to_numpy(float), equal_nan=True), \
-                    "{} s{}: shape column {} differs from the clean table".format(mid, s, col)
-            assert (np.asarray(g["label"]).astype(str) == lab).all(), "{} s{}: labels differ".format(mid, s)
+                if not np.array_equal(g[col].to_numpy(float), c[col].to_numpy(float), equal_nan=True):
+                    raise ValueError("{} s{}: shape column {} differs from the clean table".format(mid, s, col))
+            if not (np.asarray(g["label"]).astype(str) == lab).all():
+                raise ValueError("{} s{}: labels differ".format(mid, s))
             m = alive & dec.ball_unknown(g)
             unk.append(m)
         y = (lab == "H").astype(float)

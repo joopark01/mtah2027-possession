@@ -72,7 +72,8 @@ def _init(cfg, tables, seeds, ids):
     _TABLES.clear()
     folds = ts.load(cfg)["lomo_folds"]
     for mid in hz.split_ids("tune", False, ids):
-        assert mid not in folds[mid]["trained_on"], "fold model for {} saw it".format(mid)
+        if mid in folds[mid]["trained_on"]:
+            raise ValueError("fold model for {} saw it".format(mid))
         for s in (seeds if tables == "degraded" else (None,)):
             df = hz.load_table(mid, tables, s)
             clean = df.drop(columns=[c for c in hz.LEAK_COLUMNS if c in df])

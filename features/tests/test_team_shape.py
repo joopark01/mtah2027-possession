@@ -136,9 +136,10 @@ def main():
         return g
     try:
         fts.run(ids, (0,), bad_loader, fts.L2_PENALTY)
-        raise AssertionError("differing degraded shape column not refused")
-    except AssertionError as e:
+    except ValueError as e:
         assert "shape column" in str(e), e
+    else:
+        raise AssertionError("differing degraded shape column not refused")
 
     # 5. Decoder hook: weight 0 reproduces decoder v1 (ball-unknown team score 0) for any p_home.
     n = 3000
